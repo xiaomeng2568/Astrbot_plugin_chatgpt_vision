@@ -1,3 +1,11 @@
+# AstrBot ChatGPT OAuth 识图
+
+官方 Sign in with ChatGPT 授权的图片描述、截图理解和 OCR，支持 QQ 直接附图与显式引用识图。
+
+[下载 v0.1.3 测试包](https://github.com/xiaomeng2568/Astrbot_plugin_chatgpt_vision/releases/tag/v0.1.3-test) · [全部历史版本](https://github.com/xiaomeng2568/Astrbot_plugin_chatgpt_vision/releases)
+
+历史原包按 v0.1.0 → v0.1.3 保存于 release-assets，中文说明见 release-notes。CI 在 Windows 与 Linux 上运行离线测试，并校验四版原包及内部文件清单。源码与文档来自独立开发的识图插件，未包含旧生图仓库、账号凭据或私人图片。
+
 # ChatGPT OAuth 识图：v0.1.3 本地测试包
 
 独立的 AstrBot 插件，通过官方 Sign in with ChatGPT 开源应用授权流程调用公开 Responses API，支持图片描述、截图问答与 OCR。没有实现 OAuth 图像生成，也不把订阅授权当作 API Key。
