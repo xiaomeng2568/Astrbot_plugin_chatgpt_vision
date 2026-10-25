@@ -1,7 +1,7 @@
 """Account-bound catalog, vision verification and bounded Responses SSE."""
 from __future__ import annotations
 
-import hashlib
+import asyncio
 import json
 import re
 import secrets
@@ -12,6 +12,7 @@ import aiohttp
 from PIL import Image, ImageDraw, ImageFont
 
 from .errors import VisionError, http_error
+from .diagnostics import record_error, record_event, record_http
 from .oauth import RESOURCE, OAuth, read_bounded
 
 RESPONSES = RESOURCE + "/responses"
@@ -41,16 +42,19 @@ def error_code(data: dict) -> str:
     return str(raw.get("code", "")) if isinstance(raw, dict) else str(raw)
 
 
-async def sse_events(content):
+async def sse_events(content, diagnostic=None):
+    diagnostic = diagnostic if diagnostic is not None else {}
     pending = b""
     lines = []
     total = 0
     async for chunk in content.iter_chunked(8192):
         total += len(chunk)
         if total > 2 * 1024 * 1024:
+            diagnostic["failure_reason"] = "stream_size_limit"
             raise VisionError("protocol")
         pending += chunk
         if len(pending) > 1024 * 1024:
+            diagnostic["failure_reason"] = "sse_line_limit"
             raise VisionError("protocol")
         while b"\n" in pending:
             line, pending = pending.split(b"\n", 1)
@@ -64,27 +68,29 @@ async def sse_events(content):
                     try:
                         data = json.loads(raw)
                     except (ValueError, UnicodeError):
+                        diagnostic["failure_reason"] = "sse_invalid_json"
                         raise VisionError("protocol") from None
                     if not isinstance(data, dict):
+                        diagnostic["failure_reason"] = "sse_non_object"
                         raise VisionError("protocol")
                     yield data
             elif line.startswith(b"data:"):
                 lines.append(line[5:].lstrip(b" "))
     # A truncated, unterminated SSE frame is not a terminal success.
     if pending.strip() or lines:
+        diagnostic["failure_reason"] = "sse_unterminated_frame"
         raise VisionError("incomplete")
 
 
-async def read_answer(content) -> str:
+async def read_answer(content, diagnostic=None) -> str:
+    diagnostic = diagnostic if diagnostic is not None else {}
     parts = []
     total_chars = 0
     completed = False
     refused = False
-    async for data in sse_events(content):
+    async for data in sse_events(content, diagnostic):
         kind = data.get("type")
-        if completed:
-            # A completed response must be terminal, except for transport [DONE].
-            raise VisionError("protocol")
+        record_event(diagnostic, kind)
         if kind == "response.output_text.delta":
             delta = data.get("delta", "")
             if not isinstance(delta, str):
@@ -97,6 +103,8 @@ async def read_answer(content) -> str:
             refused = True
         elif kind in {"response.failed", "error"}:
             response = data.get("response", data)
+            record_error(diagnostic, response)
+            diagnostic["failure_reason"] = "stream_failed"
             code = error_code(response) if isinstance(response, dict) else ""
             if code == "subscription_sharing_usage_limit_exceeded":
                 raise VisionError("quota")
@@ -111,10 +119,12 @@ async def read_answer(content) -> str:
                 raise VisionError("permission")
             raise VisionError("protocol")
         elif kind == "response.incomplete":
+            diagnostic["failure_reason"] = "response_incomplete"
             raise VisionError("incomplete")
         elif kind == "response.completed":
             response = data.get("response", {})
             if response.get("status") != "completed" or response.get("error"):
+                diagnostic["failure_reason"] = "invalid_completed_state"
                 raise VisionError("incomplete")
             completed = True
             output = response.get("output", [])
@@ -128,12 +138,18 @@ async def read_answer(content) -> str:
                             final_parts.append(value["text"])
             if not parts:
                 parts = final_parts
+            # This is the protocol's terminal success event. Waiting for transport
+            # EOF can turn an already completed result into an idle/proxy timeout.
+            break
     if not completed:
+        diagnostic.setdefault("failure_reason", "stream_without_completed")
         raise VisionError("incomplete")
     if refused:
+        diagnostic["failure_reason"] = "response_refused"
         raise VisionError("refused")
     text = "".join(parts).strip()
     if not text:
+        diagnostic["failure_reason"] = "completed_without_text"
         raise VisionError("protocol")
     return text
 
@@ -169,10 +185,13 @@ def make_probe() -> tuple[str, str]:
 class VisionClient:
     def __init__(self, oauth: OAuth, timeout=90):
         self.oauth, self.store, self.session = oauth, oauth.store, oauth.session
-        self.timeout = max(10, min(timeout, 180))
+        self.timeout = max(10, min(timeout, 300))
         self.cooldown_until = 0.0
+        self.diagnostic = {}
 
     async def _call(self, url: str, payload: dict | None = None, expected_account: str | None = None):
+        operation = "responses" if payload else "models"
+        self.diagnostic = {"operation": operation, "stage": "credential", "timeout_seconds": self.timeout}
         if time.monotonic() < self.cooldown_until:
             raise VisionError("quota")
         for attempt in range(2):
@@ -180,10 +199,15 @@ class VisionClient:
             if expected_account is not None and account_id != expected_account:
                 raise VisionError("auth_invalid")
             headers = {"Authorization": "Bearer " + token, "Accept": "text/event-stream" if payload else "application/json"}
+            if payload:
+                headers["Cache-Control"] = "no-cache"
+            self.diagnostic["stage"] = "http_connect"
             try:
                 async with self.session.request("POST" if payload else "GET", url, json=payload,
                                                 headers=headers, allow_redirects=False,
-                                                timeout=aiohttp.ClientTimeout(total=self.timeout, sock_read=45)) as response:
+                                                timeout=aiohttp.ClientTimeout(total=self.timeout, sock_connect=30, sock_read=self.timeout)) as response:
+                    self.diagnostic["stage"] = "http_response"
+                    record_http(self.diagnostic, response)
                     if response.status == 401 and attempt == 0:
                         await read_bounded(response)
                         continue
@@ -191,9 +215,12 @@ class VisionClient:
                         raw = await read_bounded(response)
                         try:
                             data = json.loads(raw)
+                            record_error(self.diagnostic, data)
                             code = error_code(data) if isinstance(data, dict) else ""
                         except (ValueError, UnicodeError):
                             code = ""
+                            self.diagnostic["body_shape"] = "non_json"
+                        self.diagnostic["failure_reason"] = "http_error"
                         if response.status == 429:
                             try:
                                 delay = min(3600, max(1, int(response.headers.get("Retry-After", "60"))))
@@ -202,10 +229,12 @@ class VisionClient:
                             self.cooldown_until = time.monotonic() + delay
                         raise http_error(response.status, code)
                     if payload:
-                        if "text/event-stream" not in response.headers.get("Content-Type", ""):
+                        if self.diagnostic["content_type"] != "text/event-stream":
+                            self.diagnostic["failure_reason"] = "unexpected_content_type"
                             raise VisionError("protocol")
+                        self.diagnostic["stage"] = "sse_stream"
                         try:
-                            result = await read_answer(response.content)
+                            result = await read_answer(response.content, self.diagnostic)
                         except VisionError as exc:
                             if exc.code == "quota":
                                 self.cooldown_until = time.monotonic() + 60
@@ -218,8 +247,29 @@ class VisionClient:
                     return result, account_id
             except VisionError:
                 raise
-            except Exception:
+            except asyncio.TimeoutError:
+                self.diagnostic["failure_reason"] = "timeout"
+                raise VisionError("timeout") from None
+            except aiohttp.ClientConnectorCertificateError:
+                self.diagnostic["failure_reason"] = "certificate_verification"
                 raise VisionError("network") from None
+            except aiohttp.ClientHttpProxyError as exc:
+                self.diagnostic["failure_reason"] = "proxy_connect"
+                self.diagnostic["proxy_http_status"] = int(exc.status)
+                raise VisionError("network") from None
+            except aiohttp.ClientConnectorError:
+                self.diagnostic["failure_reason"] = "connect_failed"
+                raise VisionError("network") from None
+            except aiohttp.ClientPayloadError:
+                self.diagnostic["failure_reason"] = "transport_payload_incomplete"
+                raise VisionError("network") from None
+            except Exception:
+                self.diagnostic["failure_reason"] = "transport_error"
+                raise VisionError("network") from None
+            finally:
+                route = getattr(self.session, "last_route", None)
+                if route in {"custom_proxy", "system_proxy", "direct"}:
+                    self.diagnostic["network_route"] = route
         raise VisionError("login_required")
 
     async def models(self) -> tuple[list[dict], str]:
@@ -242,6 +292,7 @@ class VisionClient:
         body["instructions"] = "忠实识别图中校验码，只返回六位字母数字，不加其他文字。"
         result, _ = await self._call(RESPONSES, body, identity)
         if result.strip() != expected:
+            self.diagnostic["failure_reason"] = "visual_probe_mismatch"
             raise VisionError("vision_unconfirmed")
         async with self.store.transaction() as state:
             if state.get("active") != identity:
@@ -249,6 +300,19 @@ class VisionClient:
             account = self.store.active(state)
             account.setdefault("verified_models", {})[slug] = time.time()
             self.store.save(state)
+        return True
+
+    async def check_text(self, slug: str) -> bool:
+        models, identity = await self.models()
+        if slug not in {m["slug"] for m in models}:
+            raise VisionError("model")
+        body = {"model": slug, "store": False, "stream": True,
+                "instructions": "只回复OK，不加其他文字。",
+                "input": [{"role": "user", "content": [{"type": "input_text", "text": "请回复OK。"}]}]}
+        result, _ = await self._call(RESPONSES, body, identity)
+        if result.strip() != "OK":
+            self.diagnostic["failure_reason"] = "text_probe_mismatch"
+            raise VisionError("protocol")
         return True
 
     async def select(self, slug: str) -> None:

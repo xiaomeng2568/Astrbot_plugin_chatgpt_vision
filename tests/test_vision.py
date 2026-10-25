@@ -258,6 +258,28 @@ class AuthTests(Base):
 
 
 class StreamTests(unittest.IsolatedAsyncioTestCase):
+    async def test_terminal_success_does_not_wait_for_transport_eof(self):
+        class LingeringContent:
+            async def iter_chunked(self, size):
+                yield frame(completed())
+                raise asyncio.TimeoutError(SENTINEL + PRIVATE_IMAGE)
+        diagnostic = {}
+        result = await read_answer(LingeringContent(), diagnostic)
+        self.assertEqual(result, '小猫在窗边发呆。')
+        self.assertEqual(diagnostic['last_event'], 'response.completed')
+
+    async def test_stream_diagnostic_omits_payload_and_unknown_event_names(self):
+        raw = frame({'type': SENTINEL, 'delta': PRIVATE_IMAGE}) + frame({'type':'response.failed',
+                    'response': {'error': {'code':SENTINEL,'message':PRIVATE_IMAGE,'param':PRIVATE_IMAGE}}})
+        diagnostic = {}
+        with self.assertRaises(VisionError):
+            await read_answer(Content(raw), diagnostic)
+        serialized = json.dumps(diagnostic)
+        self.assertNotIn(SENTINEL, serialized)
+        self.assertNotIn(PRIVATE_IMAGE, serialized)
+        self.assertEqual(diagnostic['event_counts']['other'], 1)
+        self.assertEqual(diagnostic['api_code'], 'unrecognized')
+
     async def test_fragmented_chinese_crlf_stream(self):
         raw=frame({"type":"response.output_text.delta","delta":"小猫"})+frame({"type":"response.output_text.delta","delta":"在发呆。"})+frame(completed("小猫在发呆。"))
         self.assertEqual(await read_answer(Content(raw.replace(b"\n",b"\r\n"),1)),"小猫在发呆。")
@@ -365,6 +387,52 @@ class ImageTests(Base):
 
 
 class ClientTests(Base):
+    async def test_http_error_diagnostic_is_allowlisted(self):
+        response = Response(400, {'error': {'code':'unsupported_parameter','type':'invalid_request_error',
+                            'param':'input[0].content[1].image_url','message':SENTINEL+PRIVATE_IMAGE}},
+                            headers={'Content-Type':'application/json','x-request-id':'req_test_123'})
+        session = Session([response]); client = VisionClient(OAuth(self.store, session))
+        with self.assertRaises(VisionError):
+            await client._call('https://api.openai.com/v1/responses', {'test':True})
+        diagnostic = client.diagnostic
+        self.assertEqual(diagnostic['http_status'],400)
+        self.assertEqual(diagnostic['api_code'],'unsupported_parameter')
+        self.assertEqual(diagnostic['api_param'],'input[0].content[1].image_url')
+        self.assertEqual(diagnostic['request_id'],'req_test_123')
+        self.assertNotIn(SENTINEL,json.dumps(diagnostic))
+        self.assertNotIn(PRIVATE_IMAGE,json.dumps(diagnostic))
+
+    async def test_html_response_reports_format_without_content(self):
+        response=Response(raw=(SENTINEL+PRIVATE_IMAGE).encode(),headers={'Content-Type':'text/html'})
+        client=VisionClient(OAuth(self.store,Session([response])))
+        with self.assertRaises(VisionError):
+            await client._call('https://api.openai.com/v1/responses', {'test':True})
+        self.assertEqual(client.diagnostic['content_type'],'text/html')
+        self.assertEqual(client.diagnostic['failure_reason'],'unexpected_content_type')
+        self.assertNotIn(SENTINEL,json.dumps(client.diagnostic))
+
+    async def test_timeout_reports_stage_without_exception_text(self):
+        class TimeoutSession:
+            def request(self,*args,**kwargs):
+                raise asyncio.TimeoutError(SENTINEL+PRIVATE_IMAGE)
+        client=VisionClient(OAuth(self.store,TimeoutSession()),180)
+        with self.assertRaises(VisionError) as error:
+            await client._call('https://api.openai.com/v1/responses',{'test':True})
+        self.assertEqual(error.exception.code,'timeout')
+        self.assertEqual(client.diagnostic['stage'],'http_connect')
+        self.assertEqual(client.diagnostic['timeout_seconds'],180)
+        self.assertNotIn(SENTINEL,json.dumps(client.diagnostic))
+
+    async def test_text_only_probe_cannot_set_visual_verification(self):
+        state=self.store.load();state['accounts']['account'].pop('verified_models');self.store.save(state)
+        session=Session([self.catalog(),Response(raw=frame(completed('OK')))])
+        client=VisionClient(OAuth(self.store,session))
+        self.assertTrue(await client.check_text('account-model'))
+        body=session.calls[-1][2]['json']
+        self.assertFalse(body['store']);self.assertTrue(body['stream'])
+        self.assertEqual([c['type'] for c in body['input'][0]['content']],['input_text'])
+        self.assertNotIn('verified_models',self.store.active(self.store.load()))
+
     def catalog(self):
         return Response(data={"models":[{"slug":"account-model","display_name":"Account model","visibility":"list"},
                                         {"slug":"hidden","visibility":"hide"}]})

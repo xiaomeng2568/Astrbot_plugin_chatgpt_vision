@@ -1,0 +1,10 @@
+v0.1.1 测试更新，2026-10-26
+
+60项离线测试通过。此更新增加安全诊断并改善流式完成/超时处理，尚未确定用户真实图片请求失败原因。
+
+先停用本插件，将本ZIP中的astrbot_plugin_chatgpt_vision目录内文件覆盖到服务器原插件目录，再重载。不要卸载清理数据，不要删除data/plugin_data/astrbot_plugin_chatgpt_vision；原有授权记录格式兼容，无需重新登录。
+
+在原CMD执行：
+"%ABPY%" manage.py --proxy "" --timeout 180 --diagnostic verify-model gpt-6.1-sol
+
+反馈“安全诊断”区块与固定错误提示即可。不要反馈完整授权链接、凭据文件、原始API响应或私人图片。

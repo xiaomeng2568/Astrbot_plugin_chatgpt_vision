@@ -83,14 +83,14 @@ async def run(args):
         # Read only this new plugin's own public network setting; never other app credentials.
         config_path = store.directory.parents[1] / "config" / "astrbot_plugin_chatgpt_vision_config.json"
         try:
-            proxy = json.loads(config_path.read_text(encoding="utf-8")).get("openai_proxy", "")
+            proxy = json.loads(config_path.read_text(encoding="utf-8-sig")).get("openai_proxy", "")
         except FileNotFoundError:
             proxy = ""
         except Exception:
-            raise VisionError("network") from None
+            raise VisionError("proxy_config") from None
     async with RoutedSession(proxy) as session:
         oauth = OAuth(store, session)
-        client = VisionClient(oauth)
+        client = VisionClient(oauth, args.timeout)
         if args.command == "login":
             await login(oauth, args.port, args.account, args.no_browser, args.new_account)
         elif args.command == "status":
@@ -115,17 +115,29 @@ async def run(args):
                 store.save(state)
             print("已切换账号，请重新验证并选择视觉模型。")
         elif args.command == "models":
-            models, _ = await client.models()
+            models, _ = await diagnostic_call(client, args, client.models())
             print(json.dumps(models, ensure_ascii=False, indent=2))
         elif args.command == "verify-model":
-            await client.verify_model(args.value)
+            await diagnostic_call(client, args, client.verify_model(args.value))
             print("视觉校验已完整成功；仅使用本机随机生成的校验图。")
+        elif args.command == "check-text":
+            await diagnostic_call(client, args, client.check_text(args.value))
+            print("纯文本Responses请求已完整成功；这一步不代表视觉能力已验证。")
         elif args.command == "select-model":
-            await client.select(args.value)
+            await diagnostic_call(client, args, client.select(args.value))
             print("已选择已验证的账号模型。")
         elif args.command == "logout":
             print("本地令牌已清除。" + ("远端会话撤销已确认。" if await oauth.logout() else
                   "远端撤销未确认，请在 ChatGPT 设置中断开本应用。"))
+
+
+async def diagnostic_call(client, args, operation):
+    try:
+        return await operation
+    finally:
+        if args.diagnostic:
+            print("安全诊断（不含Token、图片、原始响应或代理地址）：")
+            print(json.dumps(client.diagnostic, ensure_ascii=False, indent=2), flush=True)
 
 
 def main():
@@ -133,6 +145,8 @@ def main():
     plugin_dir = Path(__file__).resolve().parent
     parser.add_argument("--data-dir", default=str(plugin_dir.parents[1] / "plugin_data" / plugin_dir.name))
     parser.add_argument("--proxy", default=None, help="Override this command's HTTP(S) proxy. Empty string uses system proxy discovery.")
+    parser.add_argument("--timeout", type=int, default=180, help="Total request timeout in seconds, bounded to 10..300")
+    parser.add_argument("--diagnostic", action="store_true", help="Print allowlisted diagnostic metadata, never raw server content")
     sub = parser.add_subparsers(dest="command", required=True)
     auth = sub.add_parser("login")
     auth.add_argument("--port", type=int, default=14558)
@@ -141,7 +155,7 @@ def main():
     auth.add_argument("--no-browser", action="store_true")
     for name in ("status", "models", "logout"):
         sub.add_parser(name)
-    for name in ("verify-model", "select-model", "use-account"):
+    for name in ("verify-model", "select-model", "use-account", "check-text"):
         sub.add_parser(name).add_argument("value")
     args = parser.parse_args()
     try:

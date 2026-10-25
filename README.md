@@ -1,8 +1,32 @@
-# ChatGPT OAuth 识图：v0.1.0 本地测试包
+# ChatGPT OAuth 识图：v0.1.1 本地测试包
 
 独立的 AstrBot 插件，通过官方 Sign in with ChatGPT 开源应用授权流程调用公开 Responses API，支持图片描述、截图问答与 OCR。没有实现 OAuth 图像生成，也不把订阅授权当作 API Key。
 
 这是待服务器联调的测试版：离线测试通过不代表你的账号必定有权限、你的地区必定可访问，或与未知的第三方转述插件已经兼容。
+
+## v0.1.1 更新与已有账号
+
+已有v0.1.0账号无需重新登录。先停用本插件，将新ZIP内同名插件目录的文件覆盖到旧插件目录，再重载；不要删除data/plugin_data/astrbot_plugin_chatgpt_vision，也不要卸载并清理插件数据。
+
+- 流式请求在确认response.completed且内容完整后结束，不再为了等待连接关闭而把成功结果误判为网络超时；完成前的失败、拒绝、中断仍不发送半截答案。
+- 去掉固定45秒读取上限；管理命令默认总超时180秒，可用--timeout指定，最大300秒。失败不会自动重放图片请求。
+- 管理命令增加--diagnostic，输出白名单化阶段、HTTP状态、响应格式、事件名称/数量和固定失败原因；不输出原始错误正文、图片、Token或代理地址。
+- 增加check-text命令，可以单独判断Responses纯文本链路，不会将其成功冒充视觉验证。
+- 允许本插件配置文件带UTF-8 BOM，配置读取失败有独立错误提示。
+
+排查视觉校验失败，先单独执行：
+
+```powershell
+python manage.py --proxy "" --timeout 180 --diagnostic verify-model gpt-6.1-sol
+```
+
+其中模型slug应来自你自己的models列表。只需反馈“安全诊断”区块和固定错误提示。若需要分离文本链路，再执行：
+
+```powershell
+python manage.py --proxy "" --timeout 180 --diagnostic check-text gpt-6.1-sol
+```
+
+这些修改是协议健壮性与诊断改进，尚未确定服务器先前失败的真实原因，也不承诺仅更新后即可解决账号/网络问题。
 
 ## 一、安装前
 

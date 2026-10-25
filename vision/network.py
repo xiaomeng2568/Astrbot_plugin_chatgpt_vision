@@ -42,6 +42,7 @@ def choose_proxy(url: str, configured="") -> str | None:
 class RoutedSession:
     def __init__(self, proxy="", **kwargs):
         self.proxy = validate_proxy(str(proxy or "").strip())
+        self.last_route = None
         # Explicit discovery avoids aiohttp trust_env also loading unrelated .netrc logins.
         self.raw = aiohttp.ClientSession(trust_env=False, cookie_jar=aiohttp.DummyCookieJar(), **kwargs)
 
@@ -52,6 +53,7 @@ class RoutedSession:
     def request(self, method, url, **kwargs):
         routing_url = kwargs.pop("routing_url", url)
         kwargs["proxy"] = choose_proxy(str(routing_url), self.proxy)
+        self.last_route = "custom_proxy" if self.proxy else ("system_proxy" if kwargs["proxy"] else "direct")
         return self.raw.request(method, url, **kwargs)
 
     async def close(self):

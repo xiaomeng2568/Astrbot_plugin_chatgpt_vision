@@ -19,11 +19,15 @@ test_401_refreshes_once_before_stream (test_vision.ClientTests.test_401_refreshe
 test_catalog_uses_account_not_hardcoded (test_vision.ClientTests.test_catalog_uses_account_not_hardcoded) ... ok
 test_describe_complete_reply_and_no_credentials_in_payload (test_vision.ClientTests.test_describe_complete_reply_and_no_credentials_in_payload) ... ok
 test_expired_verification_blocks_private_image (test_vision.ClientTests.test_expired_verification_blocks_private_image) ... ok
+test_html_response_reports_format_without_content (test_vision.ClientTests.test_html_response_reports_format_without_content) ... ok
+test_http_error_diagnostic_is_allowlisted (test_vision.ClientTests.test_http_error_diagnostic_is_allowlisted) ... ok
 test_incorrect_probe_does_not_confirm_vision (test_vision.ClientTests.test_incorrect_probe_does_not_confirm_vision) ... ok
 test_logout_during_request_suppresses_result (test_vision.ClientTests.test_logout_during_request_suppresses_result) ... ok
 test_model_not_in_account_cannot_be_selected (test_vision.ClientTests.test_model_not_in_account_cannot_be_selected) ... ok
 test_quota_no_retry_no_fallback_and_no_private_error (test_vision.ClientTests.test_quota_no_retry_no_fallback_and_no_private_error) ... ok
 test_synthetic_vision_verification_and_selection (test_vision.ClientTests.test_synthetic_vision_verification_and_selection) ... ok
+test_text_only_probe_cannot_set_visual_verification (test_vision.ClientTests.test_text_only_probe_cannot_set_visual_verification) ... ok
+test_timeout_reports_stage_without_exception_text (test_vision.ClientTests.test_timeout_reports_stage_without_exception_text) ... ok
 test_animated_and_pixel_bomb_rejected (test_vision.ImageTests.test_animated_and_pixel_bomb_rejected) ... ok
 test_data_uri_is_reencoded (test_vision.ImageTests.test_data_uri_is_reencoded) ... ok
 test_dns_rebinding_answer_rejected (test_vision.ImageTests.test_dns_rebinding_answer_rejected) ... ok
@@ -52,8 +56,10 @@ test_partial_then_quota_never_returns_partial (test_vision.StreamTests.test_part
 test_plain_reply_and_secret_scrubbing (test_vision.StreamTests.test_plain_reply_and_secret_scrubbing) ... ok
 test_refusal_not_success (test_vision.StreamTests.test_refusal_not_success) ... ok
 test_request_contains_only_supported_fields (test_vision.StreamTests.test_request_contains_only_supported_fields) ... ok
+test_stream_diagnostic_omits_payload_and_unknown_event_names (test_vision.StreamTests.test_stream_diagnostic_omits_payload_and_unknown_event_names) ... ok
+test_terminal_success_does_not_wait_for_transport_eof (test_vision.StreamTests.test_terminal_success_does_not_wait_for_transport_eof) ... ok
 
 ----------------------------------------------------------------------
-Ran 54 tests in 0.701s
+Ran 60 tests in 0.748s
 
 OK
