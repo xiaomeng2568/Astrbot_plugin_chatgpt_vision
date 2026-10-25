@@ -1,0 +1,4 @@
+# Already included in current AstrBot dependencies; no installer or login script installs packages.
+aiohttp>=3.11.18
+Pillow>=11.2.1
+cryptography>=44.0.3
