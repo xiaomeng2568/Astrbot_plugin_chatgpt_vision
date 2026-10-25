@@ -44,12 +44,24 @@ test_fake_or_oversized_images_rejected (test_vision.ImageTests.test_fake_or_over
 test_local_boundaries_and_unc (test_vision.ImageTests.test_local_boundaries_and_unc) ... ok
 test_metadata_removed (test_vision.ImageTests.test_metadata_removed) ... ok
 test_private_urls_and_credentials_rejected (test_vision.ImageTests.test_private_urls_and_credentials_rejected) ... ok
+test_adapter_error_or_timeout_never_exposes_payload (test_vision.MessageTests.test_adapter_error_or_timeout_never_exposes_payload) ... ok
 test_auto_disabled_does_not_intercept (test_vision.MessageTests.test_auto_disabled_does_not_intercept) ... ok
+test_auto_mode_does_not_read_quoted_images (test_vision.MessageTests.test_auto_mode_does_not_read_quoted_images) ... ok
 test_direct_and_optional_reply_extraction (test_vision.MessageTests.test_direct_and_optional_reply_extraction) ... ok
 test_errors_and_logs_exclude_private_payload (test_vision.MessageTests.test_errors_and_logs_exclude_private_payload) ... ok
 test_existing_backend_does_not_intercept (test_vision.MessageTests.test_existing_backend_does_not_intercept) ... ok
+test_existing_quote_chain_does_not_fetch_again (test_vision.MessageTests.test_existing_quote_chain_does_not_fetch_again) ... ok
 test_group_and_user_permission_before_image_download (test_vision.MessageTests.test_group_and_user_permission_before_image_download) ... ok
+test_group_quote_without_optional_group_metadata (test_vision.MessageTests.test_group_quote_without_optional_group_metadata) ... ok
+test_no_reply_fetch_for_unauthorized_user_or_group (test_vision.MessageTests.test_no_reply_fetch_for_unauthorized_user_or_group) ... ok
 test_oauth_reply_once_stops_native_pipeline (test_vision.MessageTests.test_oauth_reply_once_stops_native_pipeline) ... ok
+test_old_disabled_setting_is_respected_and_explained (test_vision.MessageTests.test_old_disabled_setting_is_respected_and_explained) ... ok
+test_onebot_cq_and_array_images_ignore_nested_content (test_vision.MessageTests.test_onebot_cq_and_array_images_ignore_nested_content) ... ok
+test_quote_id_fetches_original_image_and_responds_once (test_vision.MessageTests.test_quote_id_fetches_original_image_and_responds_once) ... ok
+test_quote_uses_existing_image_validation_and_limit (test_vision.MessageTests.test_quote_uses_existing_image_validation_and_limit) ... ok
+test_raw_platform_reply_when_component_was_not_built (test_vision.MessageTests.test_raw_platform_reply_when_component_was_not_built) ... ok
+test_reject_cross_conversation_and_wrong_message (test_vision.MessageTests.test_reject_cross_conversation_and_wrong_message) ... ok
+test_reply_fetch_is_bounded_and_cancelable (test_vision.MessageTests.test_reply_fetch_is_bounded_and_cancelable) ... ok
 test_auth_and_model_requests_share_proxy_without_netrc (test_vision.ProxyTests.test_auth_and_model_requests_share_proxy_without_netrc) ... ok
 test_custom_proxy_overrides_system (test_vision.ProxyTests.test_custom_proxy_overrides_system) ... ok
 test_empty_uses_system_route (test_vision.ProxyTests.test_empty_uses_system_route) ... ok
@@ -70,6 +82,6 @@ test_stream_diagnostic_omits_payload_and_unknown_event_names (test_vision.Stream
 test_terminal_success_does_not_wait_for_transport_eof (test_vision.StreamTests.test_terminal_success_does_not_wait_for_transport_eof) ... ok
 
 ----------------------------------------------------------------------
-Ran 70 tests in 1.028s
+Ran 82 tests in 1.171s
 
 OK

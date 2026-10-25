@@ -4,6 +4,7 @@ from __future__ import annotations
 import asyncio
 import hashlib
 import inspect
+import re
 import time
 from collections import OrderedDict
 from pathlib import Path
@@ -37,7 +38,92 @@ def image_references(event, include_replies=False) -> list[str]:
                     value = child.url or child.file
                     if value:
                         refs.append(str(value))
+                elif isinstance(child, dict):
+                    refs.extend(segment_images([child]))
     return list(dict.fromkeys(refs))
+
+
+def segment_images(message) -> list[str]:
+    """Read only image segments; never follow nested replies/forwards or text URLs."""
+    if isinstance(message, str):
+        if len(message) > 1024 * 1024:
+            raise VisionError("reply")
+        segments = []
+        for match in re.finditer(r"\[CQ:image,([^\]]*)\]", message):
+            data = {}
+            for field in match.group(1).split(","):
+                key, sep, value = field.partition("=")
+                if sep:
+                    for encoded, decoded in [("&#44;", ","), ("&#91;", "["), ("&#93;", "]"), ("&amp;", "&")]:
+                        value = value.replace(encoded, decoded)
+                    data[key] = value
+            segments.append({"type": "image", "data": data})
+        message = segments
+    if not isinstance(message, list) or len(message) > 1000:
+        raise VisionError("reply")
+    refs = []
+    for segment in message:
+        if not isinstance(segment, dict) or segment.get("type") != "image":
+            continue
+        data = segment.get("data", {})
+        if isinstance(data, dict):
+            value = data.get("url") or data.get("file")
+            if isinstance(value, str) and value:
+                refs.append(value)
+    return list(dict.fromkeys(refs))
+
+
+async def replied_image_references(event) -> list[str]:
+    """OneBot fallback: only the exact platform-supplied reply, never chat history."""
+    if event.get_platform_name() != "aiocqhttp":
+        return []
+    reply_ids = [str(c.id) for c in event.get_messages()
+                 if isinstance(c, Comp.Reply) and getattr(c, "id", None) is not None]
+    raw = getattr(event.message_obj, "raw_message", None)
+    # Some adapters fail to materialize Reply after their initial get_msg fails.
+    if not reply_ids and isinstance(raw, dict) and isinstance(raw.get("message"), list):
+        reply_ids = [str(s["data"]["id"]) for s in raw["message"]
+                     if isinstance(s, dict) and s.get("type") == "reply"
+                     and isinstance(s.get("data"), dict) and "id" in s["data"]]
+    if not reply_ids:
+        return []
+    if len(set(reply_ids)) != 1 or not re.fullmatch(r"-?\d{1,20}", reply_ids[0]):
+        raise VisionError("reply")
+    try:
+        bot = getattr(event, "bot", None)
+        if bot is None:
+            raise VisionError("reply")
+        own_id = str(getattr(event.message_obj, "self_id", "") or "")
+        routing = {"self_id": own_id} if own_id else {}
+        result = await asyncio.wait_for(bot.call_action(action="get_msg", message_id=int(reply_ids[0]), **routing), 10)
+        if isinstance(result, dict) and "data" in result and "message" not in result:
+            if result.get("retcode", 0) != 0 or result.get("status", "ok") != "ok":
+                raise VisionError("reply")
+            result = result["data"]
+        if not isinstance(result, dict) or str(result.get("message_id", "")) != str(int(reply_ids[0])):
+            raise VisionError("reply")
+        group = str(event.get_group_id() or "")
+        # OneBot does not require group_id in get_msg. IDs originate only from the
+        # trusted incoming reply segment; reject contradictory metadata if present.
+        returned_group = str(result.get("group_id") or "")
+        kind = result.get("message_type")
+        if (returned_group and returned_group != group) or (group and kind == "private") or (not group and kind == "group"):
+            raise VisionError("reply")
+        if result.get("self_id") and own_id and str(result["self_id"]) != own_id:
+            raise VisionError("reply")
+        if not group:
+            sender = result.get("sender") or {}
+            sender_id = str(sender.get("user_id", "")) if isinstance(sender, dict) else ""
+            if sender_id not in {str(event.get_sender_id()), own_id} or not sender_id:
+                raise VisionError("reply")
+            if result.get("target_id") and str(result["target_id"]) not in {str(event.get_sender_id()), own_id}:
+                raise VisionError("reply")
+        return segment_images(result.get("message", []))
+    except asyncio.CancelledError:
+        raise
+    except Exception:
+        # Adapter exceptions may include URLs, images or credentials.
+        raise VisionError("reply") from None
 
 
 class ChatGPTVisionPlugin(Star):
@@ -108,15 +194,19 @@ class ChatGPTVisionPlugin(Star):
             # Never log persona content or attach it to diagnostics.
             return ""
 
-    async def _handle(self, event, refs, prompt):
+    async def _handle(self, event, refs, prompt, resolve_replies=False):
         if not self._claim(event):
             return
         try:
             if not self._authorized(event):
                 await event.send(event.plain_result("这个识图账号还没允许当前用户或群使用，请联系管理员。"))
                 return
+            if resolve_replies and not refs:
+                refs = await replied_image_references(event)
             if not refs:
-                await event.send(event.plain_result("唔，请带上一张图片，或引用图片后再说识图。"))
+                message = ("唔，请带上一张图片，或引用图片后再说识图。" if resolve_replies else
+                           "唔，请带上一张图片；引用识图需先在插件设置开启 include_replied_images。")
+                await event.send(event.plain_result(message))
                 return
             if len(refs) > 3:
                 raise VisionError("image_limit")
@@ -162,7 +252,8 @@ class ChatGPTVisionPlugin(Star):
             if prompt.startswith(prefix):
                 prompt = prompt[len(prefix):].strip()
                 break
-        await self._handle(event, image_references(event, self.config.get("include_replied_images", False)), prompt)
+        include_replies = self.config.get("include_replied_images", True)
+        await self._handle(event, image_references(event, include_replies), prompt, resolve_replies=include_replies)
 
     @filter.on_waiting_llm_request(priority=1000000)
     async def automatic_vision(self, event: AstrMessageEvent):

@@ -612,7 +612,7 @@ def load_plugin():
     class ComponentImage:
         def __init__(self,url):self.url=url;self.file=''
     class Reply:
-        def __init__(self,chain):self.chain=chain
+        def __init__(self,chain=None,id='42'):self.chain=chain;self.id=id
     api=types.ModuleType('astrbot.api');api.AstrBotConfig=dict;api.logger=logging.getLogger('vision-test')
     event=types.ModuleType('astrbot.api.event');event.AstrMessageEvent=object
     event.filter=types.SimpleNamespace(command=decorate,on_waiting_llm_request=decorate)
@@ -637,7 +637,7 @@ def load_plugin():
 class Event:
     def __init__(self,images,group='',sender='123',admin=True):
         self.images=images;self.group=group;self.sender=sender;self.admin=admin
-        self.message_obj=types.SimpleNamespace(message_id='qq-test-1')
+        self.message_obj=types.SimpleNamespace(message_id='qq-test-1',self_id='456')
         self.unified_msg_origin='qq:private:123';self.extra={};self.sent=[];self.stopped=False
     def get_messages(self):return self.images
     def get_extra(self,key,default=None):return self.extra.get(key,default)
@@ -669,6 +669,116 @@ class MessageTests(Base):
         event=Event([self.Image('first'),self.Reply([self.Image('quoted')]),self.Image('first')])
         self.assertEqual(self.plugin.image_references(event),['first'])
         self.assertEqual(self.plugin.image_references(event,True),['first','quoted'])
+
+    def quote_event(self, result=None, **kwargs):
+        event=Event([self.Reply()], **kwargs)
+        if result is None:
+            result={'message_id':42,'message_type':'private','sender':{'user_id':123},
+                    'message':[{'type':'image','data':{'url':'https://cdn.example.com/fish.png'}}]}
+        event.bot=types.SimpleNamespace(call_action=AsyncMock(return_value=result))
+        return event
+
+    async def test_quote_id_fetches_original_image_and_responds_once(self):
+        plugin=self.plugin_instance({'backend':'chatgpt_oauth'})
+        event=self.quote_event()
+        await plugin.describe_command(event)
+        await plugin.describe_command(event)
+        event.bot.call_action.assert_awaited_once_with(action='get_msg',message_id=42,self_id='456')
+        plugin.reader.read.assert_awaited_once_with('https://cdn.example.com/fish.png')
+        self.assertEqual(event.sent,['小猫在发呆。'])
+        self.assertTrue(event.stopped)
+
+    async def test_existing_quote_chain_does_not_fetch_again(self):
+        plugin=self.plugin_instance({'backend':'chatgpt_oauth'})
+        event=self.quote_event();event.images=[self.Reply([self.Image('quoted')])]
+        await plugin.describe_command(event)
+        event.bot.call_action.assert_not_awaited()
+        plugin.reader.read.assert_awaited_once_with('quoted')
+
+    async def test_old_disabled_setting_is_respected_and_explained(self):
+        plugin=self.plugin_instance({'backend':'chatgpt_oauth','include_replied_images':False})
+        event=self.quote_event();await plugin.describe_command(event)
+        event.bot.call_action.assert_not_awaited();plugin.reader.read.assert_not_awaited()
+        self.assertIn('include_replied_images',event.sent[0])
+
+    async def test_raw_platform_reply_when_component_was_not_built(self):
+        plugin=self.plugin_instance({'backend':'chatgpt_oauth'})
+        event=self.quote_event();event.images=[]
+        event.message_obj.raw_message={'message':[{'type':'reply','data':{'id':'42'}}]}
+        await plugin.describe_command(event)
+        event.bot.call_action.assert_awaited_once()
+        self.assertEqual(event.sent,['小猫在发呆。'])
+
+    async def test_no_reply_fetch_for_unauthorized_user_or_group(self):
+        for kwargs in [{'sender':'999','admin':False},{'group':'999'}]:
+            plugin=self.plugin_instance({'backend':'chatgpt_oauth'})
+            event=self.quote_event(**kwargs);await plugin.describe_command(event)
+            event.bot.call_action.assert_not_awaited();plugin.reader.read.assert_not_awaited()
+
+    async def test_auto_mode_does_not_read_quoted_images(self):
+        plugin=self.plugin_instance({'backend':'chatgpt_oauth','auto_reply':True})
+        event=self.quote_event();await plugin.automatic_vision(event)
+        event.bot.call_action.assert_not_awaited();self.assertFalse(event.stopped)
+
+    async def test_reject_cross_conversation_and_wrong_message(self):
+        results=[{'message_id':43}, {'message_id':42,'group_id':'999'},
+                 {'message_id':42,'message_type':'group'},
+                 {'message_id':42,'sender':{'user_id':'999'}},
+                 {'message_id':42,'self_id':'999'},
+                 {'message_id':42,'sender':{'user_id':'456'},'target_id':'999'}]
+        for result in results:
+            plugin=self.plugin_instance({'backend':'chatgpt_oauth'})
+            event=self.quote_event(result)
+            with self.assertLogs('vision-test',level='WARNING'):
+                await plugin.describe_command(event)
+            plugin.reader.read.assert_not_awaited();plugin.fake_client.describe.assert_not_awaited()
+            self.assertIn('引用原图',event.sent[0])
+
+    async def test_group_quote_without_optional_group_metadata(self):
+        plugin=self.plugin_instance({'backend':'chatgpt_oauth','allowed_group_ids':['777']})
+        event=self.quote_event({'message_id':42,'message_type':'group','message':[
+            {'type':'image','data':{'url':'group-image'}}]},group='777')
+        await plugin.describe_command(event)
+        plugin.reader.read.assert_awaited_once_with('group-image')
+
+    async def test_adapter_error_or_timeout_never_exposes_payload(self):
+        for error in [RuntimeError(SENTINEL+' '+PRIVATE_IMAGE),asyncio.TimeoutError()]:
+            plugin=self.plugin_instance({'backend':'chatgpt_oauth'})
+            event=self.quote_event();event.bot.call_action.side_effect=error
+            with self.assertLogs('vision-test',level='WARNING') as captured:
+                await plugin.describe_command(event)
+            joined=' '.join(captured.output+event.sent)
+            self.assertNotIn(SENTINEL,joined);self.assertNotIn(PRIVATE_IMAGE,joined)
+            plugin.reader.read.assert_not_awaited()
+
+    async def test_reply_fetch_is_bounded_and_cancelable(self):
+        event=self.quote_event()
+        with patch.object(self.plugin.asyncio,'wait_for',wraps=asyncio.wait_for) as bounded:
+            await self.plugin.replied_image_references(event)
+        self.assertEqual(bounded.call_args.args[1],10)
+        event.bot.call_action.side_effect=asyncio.CancelledError()
+        with self.assertRaises(asyncio.CancelledError):
+            await self.plugin.replied_image_references(event)
+
+    def test_onebot_cq_and_array_images_ignore_nested_content(self):
+        message='[CQ:image,file=fish.png,url=https://cdn.example.com/a?x=1&amp;y=2&#44;3]'
+        self.assertEqual(self.plugin.segment_images(message),['https://cdn.example.com/a?x=1&y=2,3'])
+        self.assertEqual(self.plugin.segment_images('[CQ:reply,id=5] https://private.invalid/a'),[])
+        self.assertEqual(self.plugin.segment_images([{'type':'forward','data':{'message':message}}]),[])
+        event=Event([self.Reply([{'type':'image','data':{'url':'dict-image'}}])])
+        self.assertEqual(self.plugin.image_references(event,True),['dict-image'])
+
+    async def test_quote_uses_existing_image_validation_and_limit(self):
+        plugin=self.plugin_instance({'backend':'chatgpt_oauth'})
+        event=self.quote_event();plugin.reader.read.side_effect=VisionError('image_source')
+        with self.assertLogs('vision-test',level='WARNING'):await plugin.describe_command(event)
+        plugin.fake_client.describe.assert_not_awaited()
+        self.assertIn('来源',event.sent[0])
+        event=self.quote_event({'message_id':42,'sender':{'user_id':123},'message':[
+            {'type':'image','data':{'url':str(i)}} for i in range(4)]})
+        plugin=self.plugin_instance({'backend':'chatgpt_oauth'})
+        with self.assertLogs('vision-test',level='WARNING'):await plugin.describe_command(event)
+        plugin.reader.read.assert_not_awaited()
 
     async def test_existing_backend_does_not_intercept(self):
         plugin=self.plugin_instance({'backend':'existing','auto_reply':True})

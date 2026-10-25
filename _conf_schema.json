@@ -6,7 +6,7 @@
   "allowed_user_ids": {"description":"允许使用的QQ用户ID","type":"list","default":[],"hint":"空列表仅允许AstrBot管理员。群内还必须符合允许群列表。"},
   "allowed_group_ids": {"description":"允许使用的QQ群ID","type":"list","default":[],"hint":"空列表禁止在所有群使用本插件的OAuth能力，管理员同样需满足群列表。"},
   "qq_platforms": {"description":"允许的QQ平台类型","type":"list","default":["aiocqhttp","qq_official","qq_official_webhook"],"hint":"填写AstrBot适配器实际platform name。Satori等仅在确认是QQ账户后手动添加，不默认处理其他平台。"},
-  "include_replied_images": {"description":"显式/OAuth识图允许引用消息中的图片","type":"bool","default":false,"hint":"自动模式始终只看本条直接图片；不取头像或聊天历史。"},
+  "include_replied_images": {"description":"显式/OAuth识图允许引用消息中的图片","type":"bool","default":true,"hint":"手机端可引用图片并发送/OAuth识图。旧版升级请手动打开此项并保存。仅读取本次引用的原消息，不遍历历史；自动模式始终只看本条直接图片。"},
   "inherit_persona": {"description":"继承当前会话人格","type":"bool","default":true,"hint":"只发送人格规则及本条问题，不发送完整聊天历史。另追加中文、天然呆、简短、纯文本规则；OCR忠实原文。"},
   "max_reply_chars": {"description":"回复字符上限","type":"int","default":500},
   "max_image_edge": {"description":"图片最长边","type":"int","default":2048,"hint":"限制512至4096；长截图OCR可调至4096，图片大小和像素限制仍有效。"},
