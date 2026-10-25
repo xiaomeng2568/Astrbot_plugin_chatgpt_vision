@@ -123,6 +123,12 @@ async def run(args):
         elif args.command == "check-text":
             await diagnostic_call(client, args, client.check_text(args.value))
             print("纯文本Responses请求已完整成功；这一步不代表视觉能力已验证。")
+        elif args.command == "self-test":
+            labels = {"text": "1/3 检查账号目录与纯文本Responses请求……",
+                      "vision": "2/3 检查随机生成图片的实际视觉请求……",
+                      "select": "3/3 保存已通过视觉验证的模型……"}
+            await diagnostic_call(client, args, client.self_test(args.value, lambda phase: print(labels[phase], flush=True)))
+            print("完整自检通过，视觉模型已选好。接下来可用QQ的 /OAuth识图 测试。")
         elif args.command == "select-model":
             await diagnostic_call(client, args, client.select(args.value))
             print("已选择已验证的账号模型。")
@@ -155,7 +161,7 @@ def main():
     auth.add_argument("--no-browser", action="store_true")
     for name in ("status", "models", "logout"):
         sub.add_parser(name)
-    for name in ("verify-model", "select-model", "use-account", "check-text"):
+    for name in ("verify-model", "select-model", "use-account", "check-text", "self-test"):
         sub.add_parser(name).add_argument("value")
     args = parser.parse_args()
     try:

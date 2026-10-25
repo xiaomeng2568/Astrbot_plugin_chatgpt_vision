@@ -30,6 +30,11 @@ class VisionError(Exception):
 
 
 def http_error(status: int, code: str = "") -> VisionError:
+    if code in {"subscription_sharing_user_not_eligible", "chatpass_v2_scope_not_authorized",
+                "chatpass_v2_invalid_authorization_context", "subscription_sharing_route_not_supported"}:
+        return VisionError("permission")
+    if code in {"subscription_sharing_usage_unavailable", "subscription_sharing_user_unavailable"}:
+        return VisionError("unavailable")
     if status == 401:
         return VisionError("login_required")
     if status == 429 or code == "subscription_sharing_usage_limit_exceeded":

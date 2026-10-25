@@ -15,16 +15,25 @@ test_temporary_refresh_keeps_credentials (test_vision.AuthTests.test_temporary_r
 test_terminal_refresh_clears_tokens_keeps_registration (test_vision.AuthTests.test_terminal_refresh_clears_tokens_keeps_registration) ... ok
 test_valid_signature_identity (test_vision.AuthTests.test_valid_signature_identity) ... ok
 test_wrong_key_and_subject (test_vision.AuthTests.test_wrong_key_and_subject) ... ok
+test_200_json_error_is_not_stream_success (test_vision.ClientTests.test_200_json_error_is_not_stream_success) ... ok
 test_401_refreshes_once_before_stream (test_vision.ClientTests.test_401_refreshes_once_before_stream) ... ok
 test_catalog_uses_account_not_hardcoded (test_vision.ClientTests.test_catalog_uses_account_not_hardcoded) ... ok
 test_describe_complete_reply_and_no_credentials_in_payload (test_vision.ClientTests.test_describe_complete_reply_and_no_credentials_in_payload) ... ok
 test_expired_verification_blocks_private_image (test_vision.ClientTests.test_expired_verification_blocks_private_image) ... ok
+test_failed_reverification_revokes_old_model_confirmation (test_vision.ClientTests.test_failed_reverification_revokes_old_model_confirmation) ... ok
+test_full_self_test_with_actual_client_steps (test_vision.ClientTests.test_full_self_test_with_actual_client_steps) ... ok
 test_html_response_reports_format_without_content (test_vision.ClientTests.test_html_response_reports_format_without_content) ... ok
 test_http_error_diagnostic_is_allowlisted (test_vision.ClientTests.test_http_error_diagnostic_is_allowlisted) ... ok
 test_incorrect_probe_does_not_confirm_vision (test_vision.ClientTests.test_incorrect_probe_does_not_confirm_vision) ... ok
 test_logout_during_request_suppresses_result (test_vision.ClientTests.test_logout_during_request_suppresses_result) ... ok
+test_missing_content_type_with_valid_sse_is_accepted (test_vision.ClientTests.test_missing_content_type_with_valid_sse_is_accepted) ... ok
 test_model_not_in_account_cannot_be_selected (test_vision.ClientTests.test_model_not_in_account_cannot_be_selected) ... ok
+test_non_stream_completed_json_cannot_confirm_vision (test_vision.ClientTests.test_non_stream_completed_json_cannot_confirm_vision) ... ok
+test_octet_stream_header_with_valid_sse_is_accepted (test_vision.ClientTests.test_octet_stream_header_with_valid_sse_is_accepted) ... ok
 test_quota_no_retry_no_fallback_and_no_private_error (test_vision.ClientTests.test_quota_no_retry_no_fallback_and_no_private_error) ... ok
+test_real_http_octet_sse_and_lingering_transport (test_vision.ClientTests.test_real_http_octet_sse_and_lingering_transport) ... ok
+test_self_test_selects_only_after_both_successes (test_vision.ClientTests.test_self_test_selects_only_after_both_successes) ... ok
+test_self_test_stops_without_image_on_text_failure (test_vision.ClientTests.test_self_test_stops_without_image_on_text_failure) ... ok
 test_synthetic_vision_verification_and_selection (test_vision.ClientTests.test_synthetic_vision_verification_and_selection) ... ok
 test_text_only_probe_cannot_set_visual_verification (test_vision.ClientTests.test_text_only_probe_cannot_set_visual_verification) ... ok
 test_timeout_reports_stage_without_exception_text (test_vision.ClientTests.test_timeout_reports_stage_without_exception_text) ... ok
@@ -48,6 +57,7 @@ test_image_proxy_pins_public_destination_and_keeps_host (test_vision.ProxyTests.
 test_system_no_proxy_and_direct (test_vision.ProxyTests.test_system_no_proxy_and_direct) ... ok
 test_unsupported_proxy_fails_privately (test_vision.ProxyTests.test_unsupported_proxy_fails_privately) ... ok
 test_bad_json_and_oversized_frame (test_vision.StreamTests.test_bad_json_and_oversized_frame) ... ok
+test_bom_named_sse_and_all_line_endings (test_vision.StreamTests.test_bom_named_sse_and_all_line_endings) ... ok
 test_completed_without_deltas (test_vision.StreamTests.test_completed_without_deltas) ... ok
 test_done_without_completed_is_failure (test_vision.StreamTests.test_done_without_completed_is_failure) ... ok
 test_fragmented_chinese_crlf_stream (test_vision.StreamTests.test_fragmented_chinese_crlf_stream) ... ok
@@ -60,6 +70,6 @@ test_stream_diagnostic_omits_payload_and_unknown_event_names (test_vision.Stream
 test_terminal_success_does_not_wait_for_transport_eof (test_vision.StreamTests.test_terminal_success_does_not_wait_for_transport_eof) ... ok
 
 ----------------------------------------------------------------------
-Ran 60 tests in 0.748s
+Ran 70 tests in 1.028s
 
 OK

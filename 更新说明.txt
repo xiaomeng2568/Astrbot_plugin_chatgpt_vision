@@ -1,10 +1,12 @@
-v0.1.1 测试更新，2026-10-26
+v0.1.2 测试更新，2026-10-26
 
-60项离线测试通过。此更新增加安全诊断并改善流式完成/超时处理，尚未确定用户真实图片请求失败原因。
+70项测试通过，包含真实回环HTTP流测试。新增在标头错误/缺失时对合法SSE的安全识别、标准换行/BOM/具名事件兼容、一次完整自检。HTTP200或JSON/HTML本身不会被当成视觉成功。
 
-先停用本插件，将本ZIP中的astrbot_plugin_chatgpt_vision目录内文件覆盖到服务器原插件目录，再重载。不要卸载清理数据，不要删除data/plugin_data/astrbot_plugin_chatgpt_vision；原有授权记录格式兼容，无需重新登录。
+先停用本插件，将ZIP中的同名目录内文件覆盖原插件目录，再重载。不要卸载清理数据，不要删除data/plugin_data/astrbot_plugin_chatgpt_vision。账号格式兼容，无需重新登录。
 
-在原CMD执行：
-"%ABPY%" manage.py --proxy "" --timeout 180 --diagnostic verify-model gpt-6.1-sol
+在原CMD执行一次：
+"%ABPY%" manage.py --proxy "" --timeout 180 --diagnostic self-test gpt-6.1-sol
 
-反馈“安全诊断”区块与固定错误提示即可。不要反馈完整授权链接、凭据文件、原始API响应或私人图片。
+也可以在服务器插件目录双击“一键自检.cmd”。自检依次完成账号目录/文本请求、校验图请求和模型选择；前一步失败会停止，不自动换代理、账号或后端。
+
+测试通过不代表未知QQ旧插件联调已通过。若官方或系统代理仍返回非SSE响应，会输出安全分类；客户端不能保证自行修复远端问题。反馈安全诊断区块即可，不要发送Token、原始响应或凭据文件。

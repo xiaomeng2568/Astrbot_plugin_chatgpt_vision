@@ -12,7 +12,7 @@ import aiohttp
 from PIL import Image, ImageDraw, ImageFont
 
 from .errors import VisionError, http_error
-from .diagnostics import record_error, record_event, record_http
+from .diagnostics import EVENTS, record_error, record_event, record_http
 from .oauth import RESOURCE, OAuth, read_bounded
 
 RESPONSES = RESOURCE + "/responses"
@@ -47,39 +47,141 @@ async def sse_events(content, diagnostic=None):
     pending = b""
     lines = []
     total = 0
+    event_name = ""
+    at_start = True
+
+    def parsed_line(line):
+        nonlocal lines, event_name
+        if not line:
+            raw = b"\n".join(lines)
+            name = event_name
+            lines, event_name = [], ""
+            if not raw or raw == b"[DONE]":
+                return None
+            try:
+                data = json.loads(raw)
+            except (ValueError, UnicodeError):
+                diagnostic["failure_reason"] = "sse_invalid_json"
+                raise VisionError("protocol") from None
+            if not isinstance(data, dict):
+                diagnostic["failure_reason"] = "sse_non_object"
+                raise VisionError("protocol")
+            if "type" not in data and name in EVENTS:
+                data["type"] = name
+            return data
+        if line.startswith(b"data:"):
+            lines.append(line[5:].lstrip(b" "))
+        elif line.startswith(b"event:"):
+            raw_name = line[6:].strip()
+            event_name = next((name for name in EVENTS if name.encode() == raw_name), "")
+        return None
+
+    def split_lines(final=False):
+        nonlocal pending
+        while pending:
+            indices = [i for i in (pending.find(b"\n"), pending.find(b"\r")) if i >= 0]
+            if not indices:
+                break
+            index = min(indices)
+            if pending[index:] == b"\r" and not final:
+                break
+            width = 2 if pending[index:index + 2] == b"\r\n" else 1
+            line, pending = pending[:index], pending[index + width:]
+            yield line
+
     async for chunk in content.iter_chunked(8192):
         total += len(chunk)
         if total > 2 * 1024 * 1024:
             diagnostic["failure_reason"] = "stream_size_limit"
             raise VisionError("protocol")
         pending += chunk
+        if at_start:
+            if len(pending) < 3 and b"\xef\xbb\xbf".startswith(pending):
+                continue
+            pending = pending.removeprefix(b"\xef\xbb\xbf")
+            at_start = False
         if len(pending) > 1024 * 1024:
             diagnostic["failure_reason"] = "sse_line_limit"
             raise VisionError("protocol")
-        while b"\n" in pending:
-            line, pending = pending.split(b"\n", 1)
-            line = line.rstrip(b"\r")
-            if not line:
-                if lines:
-                    raw = b"\n".join(lines)
-                    lines = []
-                    if raw == b"[DONE]":
-                        continue
-                    try:
-                        data = json.loads(raw)
-                    except (ValueError, UnicodeError):
-                        diagnostic["failure_reason"] = "sse_invalid_json"
-                        raise VisionError("protocol") from None
-                    if not isinstance(data, dict):
-                        diagnostic["failure_reason"] = "sse_non_object"
-                        raise VisionError("protocol")
-                    yield data
-            elif line.startswith(b"data:"):
-                lines.append(line[5:].lstrip(b" "))
+        for line in split_lines():
+            data = parsed_line(line)
+            if data is not None:
+                yield data
+    for line in split_lines(final=True):
+        data = parsed_line(line)
+        if data is not None:
+            yield data
     # A truncated, unterminated SSE frame is not a terminal success.
     if pending.strip() or lines:
         diagnostic["failure_reason"] = "sse_unterminated_frame"
         raise VisionError("incomplete")
+
+
+class PrefetchedContent:
+    """Replay the bounded detection prefix without copying or rereading the stream."""
+    def __init__(self, prefix, iterator):
+        self.prefix, self.iterator = prefix, iterator
+
+    async def iter_chunked(self, _size):
+        if self.prefix:
+            yield self.prefix
+        async for chunk in self.iterator:
+            yield chunk
+
+
+async def detect_stream(content, diagnostic):
+    iterator = content.iter_chunked(4096).__aiter__()
+    prefix = b""
+    kind = "empty"
+    async for chunk in iterator:
+        prefix += chunk
+        if len(prefix) < 3 and b"\xef\xbb\xbf".startswith(prefix):
+            continue
+        sample = prefix.removeprefix(b"\xef\xbb\xbf").lstrip(b" \t\r\n")
+        if sample.startswith((b":", b"event:", b"data:", b"id:", b"retry:")):
+            kind = "sse"
+            break
+        if sample.startswith((b"{", b"[")):
+            kind = "json"
+            break
+        if sample.startswith(b"<"):
+            kind = "html"
+            break
+        starts = (b"event:", b"data:", b"id:", b"retry:")
+        if sample and not any(value.startswith(sample) for value in starts):
+            kind = "binary_or_unknown"
+            break
+        if len(prefix) >= 4096:
+            kind = "binary_or_unknown"
+            break
+    diagnostic["body_format"] = kind
+    return kind, PrefetchedContent(prefix, iterator)
+
+
+async def response_answer(content, diagnostic):
+    kind, replay = await detect_stream(content, diagnostic)
+    if kind == "sse":
+        diagnostic["stage"] = "sse_stream"
+        if diagnostic.get("content_type") != "text/event-stream":
+            diagnostic["header_body_mismatch"] = True
+        return await read_answer(replay, diagnostic)
+    if kind == "json":
+        diagnostic["stage"] = "json_response"
+        try:
+            # Inspect structure and allowlisted codes only; never print the JSON.
+            holder = type("ResponseBody", (), {"content": replay})()
+            data = json.loads(await read_bounded(holder))
+            record_error(diagnostic, data)
+        except (ValueError, UnicodeError):
+            diagnostic["failure_reason"] = "json_or_jsonlines_not_sse"
+            raise VisionError("protocol") from None
+        if isinstance(data, dict) and ("error" in data or "detail" in data):
+            diagnostic["failure_reason"] = "json_error_response"
+            raise http_error(200, error_code(data))
+        diagnostic["failure_reason"] = "non_stream_response"
+        raise VisionError("protocol")
+    diagnostic["failure_reason"] = "html_response" if kind == "html" else "unrecognized_response_format"
+    raise VisionError("protocol")
 
 
 async def read_answer(content, diagnostic=None) -> str:
@@ -188,10 +290,13 @@ class VisionClient:
         self.timeout = max(10, min(timeout, 300))
         self.cooldown_until = 0.0
         self.diagnostic = {}
+        self.self_test_phase = None
 
     async def _call(self, url: str, payload: dict | None = None, expected_account: str | None = None):
         operation = "responses" if payload else "models"
         self.diagnostic = {"operation": operation, "stage": "credential", "timeout_seconds": self.timeout}
+        if self.self_test_phase in {"text", "vision", "select"}:
+            self.diagnostic["self_test_phase"] = self.self_test_phase
         if time.monotonic() < self.cooldown_until:
             raise VisionError("quota")
         for attempt in range(2):
@@ -229,12 +334,9 @@ class VisionClient:
                             self.cooldown_until = time.monotonic() + delay
                         raise http_error(response.status, code)
                     if payload:
-                        if self.diagnostic["content_type"] != "text/event-stream":
-                            self.diagnostic["failure_reason"] = "unexpected_content_type"
-                            raise VisionError("protocol")
-                        self.diagnostic["stage"] = "sse_stream"
+                        self.diagnostic["stage"] = "response_format"
                         try:
-                            result = await read_answer(response.content, self.diagnostic)
+                            result = await response_answer(response.content, self.diagnostic)
                         except VisionError as exc:
                             if exc.code == "quota":
                                 self.cooldown_until = time.monotonic() + 60
@@ -287,6 +389,15 @@ class VisionClient:
         models, identity = await self.models()
         if slug not in {m["slug"] for m in models}:
             raise VisionError("model")
+        async with self.store.transaction() as state:
+            if state.get("active") != identity:
+                raise VisionError("auth_invalid")
+            current = self.store.active(state)
+            if isinstance(current.get("verified_models"), dict):
+                current["verified_models"].pop(slug, None)
+            if current.get("selected_model") == slug:
+                current.pop("selected_model", None)
+            self.store.save(state)
         expected, image = make_probe()
         body = request_body(slug, "只返回图片中的六位校验码，保留大小写，不要解释。", [image])
         body["instructions"] = "忠实识别图中校验码，只返回六位字母数字，不加其他文字。"
@@ -301,6 +412,18 @@ class VisionClient:
             account.setdefault("verified_models", {})[slug] = time.time()
             self.store.save(state)
         return True
+
+    async def self_test(self, slug: str, progress=None):
+        # No private inputs and no automatic alternative route/provider/model.
+        try:
+            for phase, operation in (("text", self.check_text), ("vision", self.verify_model), ("select", self.select)):
+                self.self_test_phase = phase
+                if progress:
+                    progress(phase)
+                await operation(slug)
+            return True
+        finally:
+            self.self_test_phase = None
 
     async def check_text(self, slug: str) -> bool:
         models, identity = await self.models()

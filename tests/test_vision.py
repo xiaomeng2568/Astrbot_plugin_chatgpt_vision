@@ -258,6 +258,14 @@ class AuthTests(Base):
 
 
 class StreamTests(unittest.IsolatedAsyncioTestCase):
+    async def test_bom_named_sse_and_all_line_endings(self):
+        body=completed()
+        body.pop('type')
+        raw=('event: response.completed\ndata: '+json.dumps(body,ensure_ascii=False)+'\n\n').encode()
+        for ending in (b'\n',b'\r\n',b'\r'):
+            result=await read_answer(Content(b'\xef\xbb\xbf'+raw.replace(b'\n',ending),1))
+            self.assertEqual(result,'小猫在窗边发呆。')
+
     async def test_terminal_success_does_not_wait_for_transport_eof(self):
         class LingeringContent:
             async def iter_chunked(self, size):
@@ -387,6 +395,97 @@ class ImageTests(Base):
 
 
 class ClientTests(Base):
+    async def test_full_self_test_with_actual_client_steps(self):
+        _,image=make_probe()
+        session=Session([self.catalog(),Response(raw=frame(completed('OK'))),self.catalog(),
+                         Response(raw=frame(completed('ABC234')),headers={'Content-Type':'application/octet-stream'}),self.catalog()])
+        client=VisionClient(OAuth(self.store,session));phases=[]
+        with patch('vision.client.make_probe',return_value=('ABC234',image)):
+            self.assertTrue(await client.self_test('account-model',phases.append))
+        self.assertEqual(phases,['text','vision','select'])
+        self.assertEqual(len(session.calls),5)
+        self.assertEqual(self.store.active(self.store.load())['selected_model'],'account-model')
+
+    async def test_failed_reverification_revokes_old_model_confirmation(self):
+        client=VisionClient(OAuth(self.store,Session([self.catalog(),Response(raw=frame(completed('wrong')))])))
+        with self.assertRaises(VisionError):await client.verify_model('account-model')
+        account=self.store.active(self.store.load())
+        self.assertNotIn('selected_model',account)
+        self.assertNotIn('account-model',account.get('verified_models',{}))
+
+    async def test_octet_stream_header_with_valid_sse_is_accepted(self):
+        response=Response(raw=frame(completed()),headers={'Content-Type':'application/octet-stream'})
+        client=VisionClient(OAuth(self.store,Session([response])))
+        result,_=await client._call('https://api.openai.com/v1/responses',{'test':True})
+        self.assertEqual(result,'小猫在窗边发呆。')
+        self.assertTrue(client.diagnostic['header_body_mismatch'])
+        self.assertEqual(client.diagnostic['body_format'],'sse')
+
+    async def test_missing_content_type_with_valid_sse_is_accepted(self):
+        response=Response(raw=frame(completed()),headers={'X-Test':'test'})
+        client=VisionClient(OAuth(self.store,Session([response])))
+        result,_=await client._call('https://api.openai.com/v1/responses',{'test':True})
+        self.assertEqual(result,'小猫在窗边发呆。')
+        self.assertEqual(client.diagnostic['content_type'],'missing')
+
+    async def test_200_json_error_is_not_stream_success(self):
+        response=Response(data={'error':{'code':'subscription_sharing_usage_limit_exceeded','message':SENTINEL+PRIVATE_IMAGE}},
+                          headers={'Content-Type':'application/octet-stream'})
+        client=VisionClient(OAuth(self.store,Session([response])))
+        with self.assertRaises(VisionError) as error:
+            await client._call('https://api.openai.com/v1/responses',{'test':True})
+        self.assertEqual(error.exception.code,'quota')
+        self.assertEqual(client.diagnostic['failure_reason'],'json_error_response')
+        self.assertNotIn(SENTINEL,json.dumps(client.diagnostic))
+
+    async def test_non_stream_completed_json_cannot_confirm_vision(self):
+        response=Response(data=completed()['response'],headers={'Content-Type':'application/json'})
+        client=VisionClient(OAuth(self.store,Session([response])))
+        with self.assertRaises(VisionError):
+            await client._call('https://api.openai.com/v1/responses',{'test':True})
+        self.assertEqual(client.diagnostic['failure_reason'],'non_stream_response')
+
+    async def test_self_test_selects_only_after_both_successes(self):
+        client=VisionClient(OAuth(self.store,Session([])))
+        client.check_text=AsyncMock(return_value=True)
+        client.verify_model=AsyncMock(return_value=True)
+        client.select=AsyncMock()
+        phases=[]
+        self.assertTrue(await client.self_test('account-model',phases.append))
+        self.assertEqual(phases,['text','vision','select'])
+        client.select.assert_awaited_once_with('account-model')
+
+    async def test_self_test_stops_without_image_on_text_failure(self):
+        client=VisionClient(OAuth(self.store,Session([])))
+        client.check_text=AsyncMock(side_effect=VisionError('quota'))
+        client.verify_model=AsyncMock();client.select=AsyncMock()
+        with self.assertRaises(VisionError):await client.self_test('account-model')
+        client.verify_model.assert_not_awaited();client.select.assert_not_awaited()
+
+    async def test_real_http_octet_sse_and_lingering_transport(self):
+        from aiohttp import web
+        release=asyncio.Event()
+        async def handler(request):
+            await request.read()
+            response=web.StreamResponse(headers={'Content-Type':'application/octet-stream'})
+            await response.prepare(request)
+            await response.write(frame(completed('OK')))
+            await release.wait()
+            return response
+        app=web.Application();app.router.add_post('/responses',handler)
+        runner=web.AppRunner(app,access_log=None);await runner.setup()
+        site=web.TCPSite(runner,'127.0.0.1',0);await site.start()
+        port=site._server.sockets[0].getsockname()[1]
+        try:
+            with patch('vision.network.choose_proxy',return_value=None):
+                async with RoutedSession() as session:
+                    client=VisionClient(OAuth(self.store,session))
+                    result,_=await asyncio.wait_for(client._call(f'http://127.0.0.1:{port}/responses',{'test':True}),2)
+            self.assertEqual(result,'OK')
+            self.assertEqual(client.diagnostic['body_format'],'sse')
+        finally:
+            release.set();await runner.cleanup()
+
     async def test_http_error_diagnostic_is_allowlisted(self):
         response = Response(400, {'error': {'code':'unsupported_parameter','type':'invalid_request_error',
                             'param':'input[0].content[1].image_url','message':SENTINEL+PRIVATE_IMAGE}},
@@ -403,12 +502,12 @@ class ClientTests(Base):
         self.assertNotIn(PRIVATE_IMAGE,json.dumps(diagnostic))
 
     async def test_html_response_reports_format_without_content(self):
-        response=Response(raw=(SENTINEL+PRIVATE_IMAGE).encode(),headers={'Content-Type':'text/html'})
+        response=Response(raw=('<html>'+SENTINEL+PRIVATE_IMAGE+'</html>').encode(),headers={'Content-Type':'text/html'})
         client=VisionClient(OAuth(self.store,Session([response])))
         with self.assertRaises(VisionError):
             await client._call('https://api.openai.com/v1/responses', {'test':True})
         self.assertEqual(client.diagnostic['content_type'],'text/html')
-        self.assertEqual(client.diagnostic['failure_reason'],'unexpected_content_type')
+        self.assertEqual(client.diagnostic['failure_reason'],'html_response')
         self.assertNotIn(SENTINEL,json.dumps(client.diagnostic))
 
     async def test_timeout_reports_stage_without_exception_text(self):

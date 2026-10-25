@@ -22,6 +22,9 @@ CODES = frozenset({
     "chatpass_v2_scope_not_authorized", "chatpass_v2_invalid_authorization_context",
 })
 TYPES = frozenset({"invalid_request_error", "authentication_error", "permission_error", "rate_limit_error", "server_error", "invalid_request"})
+MEDIA_TYPES = frozenset({"application/json", "text/event-stream", "text/html", "text/plain",
+                        "application/octet-stream", "application/x-ndjson", "application/ndjson",
+                        "application/jsonl", "application/json-seq", "text/json", "application/x-json-stream"})
 
 
 def record_error(diagnostic: dict, data: object) -> None:
@@ -54,7 +57,9 @@ def record_event(diagnostic: dict, kind: object) -> None:
 def record_http(diagnostic: dict, response) -> None:
     diagnostic["http_status"] = int(response.status)
     content_type = str(response.headers.get("Content-Type", "")).split(";", 1)[0].strip().lower()
-    diagnostic["content_type"] = content_type if content_type in {"application/json", "text/event-stream", "text/html", "text/plain"} else "other"
+    diagnostic["content_type"] = content_type if content_type in MEDIA_TYPES else ("missing" if not content_type else "other")
+    encoding = str(response.headers.get("Content-Encoding", "")).strip().lower()
+    diagnostic["content_encoding"] = encoding if encoding in {"gzip", "br", "deflate", "zstd", "identity"} else ("missing" if not encoding else "other")
     request_id = response.headers.get("x-request-id", "")
     if isinstance(request_id, str) and re.fullmatch(r"req_[A-Za-z0-9_-]{1,100}", request_id):
         diagnostic["request_id"] = request_id
