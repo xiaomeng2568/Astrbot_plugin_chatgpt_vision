@@ -203,6 +203,27 @@ class ChatGPTVisionPlugin(Star):
             # Never log persona content or attach it to diagnostics.
             return ""
 
+    async def _metered_describe(self, event, client, prompt, images, persona, max_chars):
+        completed = False
+        client.last_meter = {}
+        try:
+            result = await client.describe(prompt, images, persona, max_chars)
+            completed = True
+            return result
+        finally:
+            meter = getattr(client, 'last_meter', {})
+            if isinstance(meter, dict) and meter.get('started') and not meter.get('reported'):
+                meter['reported'] = True
+                try:
+                    meta = self.context.get_registered_star('astrbot_plugin_token_usage')
+                    if meta and getattr(meta, 'activated', False) and getattr(meta, 'star_cls', None):
+                        await meta.star_cls.ingest_external(
+                            event, request_id=meter['request_id'], model=meter.get('model', ''),
+                            usage=meter.get('usage', {}), status='completed' if completed else 'failed')
+                except Exception:
+                    # A statistics failure must never expose payloads or break vision.
+                    logger.warning('[ChatGPTVision] usage reporting unavailable')
+
     async def _handle(self, event, refs, prompt, resolve_replies=False):
         if not self._claim(event):
             return
@@ -236,8 +257,8 @@ class ChatGPTVisionPlugin(Star):
                     if total > 16 * 1024 * 1024:
                         raise VisionError("image_limit")
                     data_urls.append(image)
-                result = await self.get_client().describe(prompt, data_urls, await self._persona(event),
-                                                          self.config.get("max_reply_chars", 500))
+                result = await self._metered_describe(event, self.get_client(), prompt, data_urls,
+                                                      await self._persona(event), self.config.get("max_reply_chars", 500))
             await event.send(event.plain_result(result))
         except asyncio.CancelledError:
             raise

@@ -1,5 +1,6 @@
-v0.1.4 local validation
-Actual authorization method: 11 policy cases passed (no mock replacement of the method).
-Python syntax and JSON schema: passed.
-Full suite: executed by GitHub Actions on Windows and Linux; see repository CI.
-Local full suite unavailable because existing .audit-deps directory is unreadable; no new dependencies installed.
+v0.1.5 offline validation
+Vision, usage capture and publication safety: 102 tests passed on Windows/Python 3.12.
+Standalone statistics plugin: 43 tests passed locally.
+Both suites also run on Windows/Linux GitHub Actions before release.
+Archive verification checks historical digests, per-file manifests, source parity and original logo SHA-256.
+No real accounts, private images or live model requests used.
