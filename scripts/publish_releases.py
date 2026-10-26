@@ -67,7 +67,7 @@ def main():
                 'body': (ROOT / 'release-notes' / (tag + '.md')).read_text(encoding='utf-8'),
                 'draft': True, 'prerelease': True, 'make_latest': 'false'})
         assets = {a['name']: a for a in request('GET', '/releases/' + str(release['id']) + '/assets')}
-        names = [item['asset']] + [extra['asset'] for extra in item.get('extra_assets', [])]
+        names = [item['asset']]
         for name in [filename for name in names for filename in (name, name + '.sha256')]:
             data = (ROOT / 'release-assets' / name).read_bytes()
             digest = 'sha256:' + hashlib.sha256(data).hexdigest()

@@ -1,2 +1,0 @@
-# Pillow is already included in AstrBot. No login/install helper installs packages.
-Pillow>=11.2.1

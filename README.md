@@ -1,6 +1,6 @@
 # AstrBot ChatGPT OAuth 识图
 
-[下载 v0.1.5 测试包](https://github.com/xiaomeng2568/Astrbot_plugin_chatgpt_vision/releases/tag/v0.1.5-test) · [历史版本](https://github.com/xiaomeng2568/Astrbot_plugin_chatgpt_vision/releases)
+[下载 v0.1.5 测试包](https://github.com/xiaomeng2568/Astrbot_plugin_chatgpt_vision/releases/tag/v0.1.5-fix1) · [历史版本](https://github.com/xiaomeng2568/Astrbot_plugin_chatgpt_vision/releases)
 
 独立的 AstrBot 插件，通过官方 Sign in with ChatGPT 开源应用授权流程调用公开 Responses API，支持图片描述、截图问答与 OCR。没有实现 OAuth 图像生成，也不把订阅授权当作 API Key。
 
@@ -88,7 +88,7 @@ OAuth失败时不会自动把原图发给DeepSeek或其他供应商。若希望�
 
 ## 用量统计
 
-如需统计QQ识图用量，另从文件安装本次Release中的“模型用量统计”插件ZIP。安装后发送 `/token` 查看今日统计，`/token 近7天` 或 `/token 累计` 查询其他周期；默认仅机器人管理员可查。
+如需统计QQ识图用量，从独立仓库 https://github.com/xiaomeng2568/Astrbot_plugin_token_usage 安装“模型用量统计”插件。安装后发送 `/token` 查看今日统计，`/token 近7天` 或 `/token 累计` 查询其他周期；默认仅机器人管理员可查。
 
 OAuth识图仅上报接口返回的数字用量，不提供API费用或订阅余额。未知用量不按0计算；不安装统计插件也能正常识图，不需重新授权。命令行自检和模型目录查询不计入QQ识图统计。
 
@@ -128,3 +128,7 @@ python manage.py logout
 ## 许可证
 
 本项目采用 [MIT License](LICENSE)。允许使用、修改、分发和商用，须保留版权及许可声明；软件按原样提供，不作担保。第三方依赖遵循各自许可证。
+
+## v0.1.5 数据目录修正
+
+修正版显式使用 StarTools.get_data_dir("astrbot_plugin_chatgpt_vision")，与 manage.py 默认目录一致。授权文件只保存在 data/plugin_data/astrbot_plugin_chatgpt_vision/，不读取或修改共享根目录的文件及权限。旧版若曾将文件写到共享根目录，请先停用插件、备份，再由管理员将确认属于本插件的 oauth-state.bin 移入该专属目录；POSIX目录权限为0700、文件为0600。不要搬动运行中的锁文件，不要递归修改共享根目录权限。如原本已在专属目录授权，无需迁移。

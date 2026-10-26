@@ -4,6 +4,7 @@ from __future__ import annotations
 import asyncio
 import hashlib
 import inspect
+import os
 import re
 import time
 from collections import OrderedDict
@@ -130,7 +131,15 @@ class ChatGPTVisionPlugin(Star):
     def __init__(self, context: Context, config: AstrBotConfig):
         super().__init__(context)
         self.context, self.config = context, config
-        self.data_dir = Path(StarTools.get_data_dir())
+        self.data_dir = Path(StarTools.get_data_dir("astrbot_plugin_chatgpt_vision"))
+        if self.data_dir.name != 'astrbot_plugin_chatgpt_vision' or self.data_dir.is_symlink():
+            raise VisionError('storage')
+        if os.name != 'nt' and self.data_dir.exists():
+            if self.data_dir.stat().st_uid != os.getuid():
+                raise VisionError('storage')
+            # AstrBot may create this dedicated child with 0755. Tighten only our
+            # own directory before Store's owner-only validation, never its parent.
+            os.chmod(self.data_dir, 0o700)
         self.store = Store(self.data_dir)
         self.session = None
         self.client = None

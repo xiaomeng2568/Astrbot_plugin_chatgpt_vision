@@ -1,6 +1,0 @@
-name: astrbot_plugin_token_usage
-display_name: 模型用量统计
-desc: 统计模型Token、缓存与预估费用，支持QQ统计卡片和ChatGPT OAuth识图上报
-version: v0.1.0
-author: xiaomeng2568
-astrbot_version: ">=4.25.3"

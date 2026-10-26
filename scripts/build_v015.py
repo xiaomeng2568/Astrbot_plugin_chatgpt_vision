@@ -1,4 +1,4 @@
-"""Build the two v0.1.5 release attachments reproducibly from reviewed sources."""
+"""Build the repaired v0.1.5 OAuth archive; statistics is published separately."""
 import hashlib
 import json
 import zipfile
@@ -7,7 +7,7 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[1]
 
 
-def package(source, plugin, version, paths):
+def package(source, plugin, version, paths, revision='-test'):
     files = {}
     for relative in paths:
         path = source / relative
@@ -22,7 +22,7 @@ def package(source, plugin, version, paths):
     manifest = ''.join(f'{hashlib.sha256(data).hexdigest()}  {name}\n'
                        for name, data in sorted(files.items())).encode()
     files['MANIFEST.sha256'] = manifest
-    name = f'{plugin}-v{version}-test.zip'
+    name = f'{plugin}-v{version}{revision}.zip'
     archive = ROOT / 'release-assets' / name
     with zipfile.ZipFile(archive, 'w', compression=zipfile.ZIP_DEFLATED) as output:
         for relative, data in sorted(files.items()):
@@ -40,16 +40,12 @@ def main():
         '__init__.py', '_conf_schema.json', '.gitignore', 'LICENSE', 'README.md',
         'IMPLEMENTATION_PLAN.md', 'main.py', 'manage.py', 'metadata.yaml', 'requirements.txt',
         'test-results.txt', '一键自检.cmd', '安全与验收说明.md', '更新说明.txt', 'logo.png',
-        'vision', 'tests/test_vision.py', 'tests/test_usage_capture.py'])
-    source = ROOT / 'companion/astrbot_plugin_token_usage'
-    companion = package(source, 'astrbot_plugin_token_usage', '0.1.0', [
-        '__init__.py', '_conf_schema.json', '.gitignore', 'LICENSE', 'README.md', 'main.py',
-        'metadata.yaml', 'requirements.txt', 'test-results.txt', 'meter', 'tests'])
+        'vision', 'tests/test_vision.py', 'tests/test_usage_capture.py'], revision='-fix1')
     plan_path = ROOT / 'release-plan.json'
     plan = json.loads(plan_path.read_text(encoding='utf-8'))
-    entry = dict(vision, tag='v0.1.5-test', title='v0.1.5-test · 可选用量统计与插件图标',
-                 commit_subject='发布 v0.1.5 可选用量统计与原始图标', extra_assets=[companion])
-    plan = [item for item in plan if item['version'] != '0.1.5'] + [entry]
+    entry = dict(vision, tag='v0.1.5-fix1', title='v0.1.5 修正版 · 数据目录隔离',
+                 commit_subject='修正 v0.1.5 修复包的 Windows 路径回归测试')
+    plan = [item for item in plan if item['tag'] != 'v0.1.5-fix1'] + [entry]
     plan_path.write_text(json.dumps(plan, ensure_ascii=False, indent=2) + '\n', encoding='utf-8', newline='\n')
     print(json.dumps(entry, ensure_ascii=False, indent=2))
 

@@ -618,7 +618,7 @@ def load_plugin():
     event.filter=types.SimpleNamespace(command=decorate,on_waiting_llm_request=decorate)
     star=types.ModuleType('astrbot.api.star');star.Context=object;star.Star=Star
     components=types.ModuleType('astrbot.api.message_components');components.Image=ComponentImage;components.Reply=Reply
-    startools=types.ModuleType('astrbot.core.star.star_tools');startools.StarTools=types.SimpleNamespace(get_data_dir=lambda:Path(tempfile.gettempdir())/'unused-vision-test')
+    startools=types.ModuleType('astrbot.core.star.star_tools');startools.StarTools=types.SimpleNamespace(get_data_dir=lambda name:Path(tempfile.gettempdir())/name)
     paths=types.ModuleType('astrbot.core.utils.astrbot_path');paths.get_astrbot_temp_path=tempfile.gettempdir
     modules={'astrbot':types.ModuleType('astrbot'),'astrbot.api':api,'astrbot.api.event':event,'astrbot.api.star':star,
              'astrbot.api.message_components':components,'astrbot.core':types.ModuleType('astrbot.core'),
@@ -664,6 +664,30 @@ class MessageTests(Base):
         plugin.fake_client=types.SimpleNamespace(describe=AsyncMock(return_value='小猫在发呆。'))
         plugin.get_client=lambda:plugin.fake_client
         return plugin
+
+    def test_constructor_uses_plugin_owned_data_directory_without_changing_parent(self):
+        parent = Path(self.tmp.name) / 'plugin_data'
+        parent.mkdir(mode=0o755)
+        before = parent.stat().st_mode
+        def data_directory(name):
+            self.assertEqual(name, 'astrbot_plugin_chatgpt_vision')
+            (parent / name).mkdir(mode=0o755)
+            return parent / name
+        with patch.object(self.plugin.StarTools, 'get_data_dir', side_effect=data_directory) as resolver:
+            plugin = self.plugin.ChatGPTVisionPlugin(object(), {})
+        resolver.assert_called_once_with('astrbot_plugin_chatgpt_vision')
+        self.assertEqual(plugin.store.path, parent / 'astrbot_plugin_chatgpt_vision' / 'oauth-state.bin')
+        self.assertEqual(parent.stat().st_mode, before)
+        if os.name != 'nt':
+            self.assertEqual(plugin.data_dir.stat().st_mode & 0o777, 0o700)
+        self.assertFalse((parent / 'oauth-state.bin').exists())
+        self.assertEqual(plugin.store.load(), {'accounts': {}, 'active': None})
+
+    def test_management_default_matches_runtime_namespace_even_if_checkout_is_renamed(self):
+        from manage import default_data_dir
+        data = Path(self.tmp.name) / 'data'
+        plugin = data / 'plugins' / 'renamed-checkout'
+        self.assertEqual(default_data_dir(plugin), (data / 'plugin_data' / 'astrbot_plugin_chatgpt_vision').resolve())
 
     def test_direct_and_optional_reply_extraction(self):
         event=Event([self.Image('first'),self.Reply([self.Image('quoted')]),self.Image('first')])
