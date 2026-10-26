@@ -687,7 +687,7 @@ class MessageTests(Base):
         from manage import default_data_dir
         data = Path(self.tmp.name) / 'data'
         plugin = data / 'plugins' / 'renamed-checkout'
-        self.assertEqual(default_data_dir(plugin), data / 'plugin_data' / 'astrbot_plugin_chatgpt_vision')
+        self.assertEqual(default_data_dir(plugin), (data / 'plugin_data' / 'astrbot_plugin_chatgpt_vision').resolve())
 
     def test_direct_and_optional_reply_extraction(self):
         event=Event([self.Image('first'),self.Reply([self.Image('quoted')]),self.Image('first')])

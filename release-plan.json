@@ -51,10 +51,10 @@
   {
     "version": "0.1.5",
     "asset": "astrbot_plugin_chatgpt_vision-v0.1.5-fix1.zip",
-    "sha256": "19b11ab26bd5aae65efbabbb93d7debdcdd6ead1c023776bf4a62b75341b11e7",
+    "sha256": "8e9dee61dd498b53d8595108169bc080034d497c98528b08378834db5d49f7f3",
     "plugin": "astrbot_plugin_chatgpt_vision",
     "tag": "v0.1.5-fix1",
     "title": "v0.1.5 修正版 · 数据目录隔离",
-    "commit_subject": "修复 v0.1.5 插件数据目录隔离"
+    "commit_subject": "修正 v0.1.5 修复包的 Windows 路径回归测试"
   }
 ]
