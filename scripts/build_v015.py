@@ -43,7 +43,7 @@ def main():
         'vision', 'tests/test_vision.py', 'tests/test_usage_capture.py'], revision='-fix1')
     plan_path = ROOT / 'release-plan.json'
     plan = json.loads(plan_path.read_text(encoding='utf-8'))
-    entry = dict(vision, tag='v0.1.5-fix1', title='v0.1.5 修正版 · 数据目录隔离',
+    entry = dict(vision, tag='v0.1.5-fix1', title='v0.1.5',
                  commit_subject='修正 v0.1.5 修复包的 Windows 路径回归测试')
     plan = [item for item in plan if item['tag'] != 'v0.1.5-fix1'] + [entry]
     plan_path.write_text(json.dumps(plan, ensure_ascii=False, indent=2) + '\n', encoding='utf-8', newline='\n')
