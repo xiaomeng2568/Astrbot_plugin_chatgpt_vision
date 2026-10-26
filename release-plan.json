@@ -1,0 +1,34 @@
+[
+  {
+    "version": "0.1.0",
+    "tag": "v0.1.0-test",
+    "title": "v0.1.0-test · 首次测试版：官方 OAuth 图片理解",
+    "asset": "astrbot_plugin_chatgpt_vision-v0.1.0-test.zip",
+    "sha256": "ef7bd4e7c4de9f2fdf648a6066b40a3f525e71a9f204c7c060f57c258a063599",
+    "commit_subject": "导入 v0.1.0 测试快照"
+  },
+  {
+    "version": "0.1.1",
+    "tag": "v0.1.1-test",
+    "title": "v0.1.1-test · 流式响应与安全诊断改进",
+    "asset": "astrbot_plugin_chatgpt_vision-v0.1.1-test.zip",
+    "sha256": "1400ff056637f45f2e16a070fc0aa0673ac874b789c9b7a100de13369fc37c03",
+    "commit_subject": "导入 v0.1.1 测试快照"
+  },
+  {
+    "version": "0.1.2",
+    "tag": "v0.1.2-test",
+    "title": "v0.1.2-test · 修复流格式兼容并增加完整自检",
+    "asset": "astrbot_plugin_chatgpt_vision-v0.1.2-test.zip",
+    "sha256": "aa00406c3a78dd069f2fabe20265487cd4ef0d113b8e06debd378d8526d66b82",
+    "commit_subject": "导入 v0.1.2 测试快照"
+  },
+  {
+    "version": "0.1.3",
+    "tag": "v0.1.3-test",
+    "title": "v0.1.3-test · 手机 QQ 引用图片识图",
+    "asset": "astrbot_plugin_chatgpt_vision-v0.1.3-test.zip",
+    "sha256": "3da0dc9aa1c6e31c3556419e04ffa8574095af3c3be8f0664219fe410bba043b",
+    "commit_subject": "导入 v0.1.3 测试快照"
+  }
+]

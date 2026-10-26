@@ -1,0 +1,6 @@
+name: astrbot_plugin_chatgpt_vision
+display_name: ChatGPT OAuth 识图
+desc: 官方 Sign in with ChatGPT 授权的图片描述、截图理解与 OCR；独立于生图和原有图片转述
+version: v0.1.3
+author: Local
+astrbot_version: ">=4.25.3"

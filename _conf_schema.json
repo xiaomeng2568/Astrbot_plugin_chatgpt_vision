@@ -1,0 +1,15 @@
+{
+  "openai_proxy": {"description":"独立OpenAI代理","type":"string","default":"","hint":"留空读取系统代理（HTTP_PROXY/HTTPS_PROXY/NO_PROXY及Windows静态系统代理）；例如http://127.0.0.1:7890。用于OAuth交换、刷新、模型目录和Responses。浏览器登录页用浏览器自身网络；不支持SOCKS/PAC。"},
+  "image_proxy": {"description":"独立QQ图片下载代理","type":"string","default":"","hint":"与OpenAI链路分开；留空走系统代理。仅支持HTTP/HTTPS。图片目标仍执行公网地址和DNS校验；代理地址不会发往模型。"},
+  "backend": {"description":"图片理解后端","type":"string","default":"existing","options":["existing","chatgpt_oauth"],"hint":"existing保留原有转述流程；chatgpt_oauth启用独立官方OAuth识图。不是API Key认证。"},
+  "auto_reply": {"description":"自动接管被唤醒的QQ图片消息","type":"bool","default":false,"hint":"默认关闭。先用/OAuth识图验证，再确认旧转述没有提前回复后开启；OAuth失败不自动转发给其他供应商。"},
+  "allowed_user_ids": {"description":"允许使用的QQ用户ID","type":"list","default":[],"hint":"空列表仅允许AstrBot管理员。群内还必须符合允许群列表。"},
+  "allowed_group_ids": {"description":"允许使用的QQ群ID","type":"list","default":[],"hint":"空列表禁止在所有群使用本插件的OAuth能力，管理员同样需满足群列表。"},
+  "qq_platforms": {"description":"允许的QQ平台类型","type":"list","default":["aiocqhttp","qq_official","qq_official_webhook"],"hint":"填写AstrBot适配器实际platform name。Satori等仅在确认是QQ账户后手动添加，不默认处理其他平台。"},
+  "include_replied_images": {"description":"显式/OAuth识图允许引用消息中的图片","type":"bool","default":true,"hint":"手机端可引用图片并发送/OAuth识图。旧版升级请手动打开此项并保存。仅读取本次引用的原消息，不遍历历史；自动模式始终只看本条直接图片。"},
+  "inherit_persona": {"description":"继承当前会话人格","type":"bool","default":true,"hint":"只发送人格规则及本条问题，不发送完整聊天历史。另追加中文、天然呆、简短、纯文本规则；OCR忠实原文。"},
+  "max_reply_chars": {"description":"回复字符上限","type":"int","default":500},
+  "max_image_edge": {"description":"图片最长边","type":"int","default":2048,"hint":"限制512至4096；长截图OCR可调至4096，图片大小和像素限制仍有效。"},
+  "request_timeout": {"description":"请求超时秒数","type":"int","default":90},
+  "trusted_image_dirs": {"description":"额外可信本地图片目录","type":"list","default":[],"hint":"默认只允许AstrBot临时目录。若QQ适配器使用本地缓存，可添加专用图片缓存目录；勿添加整盘、用户目录或含凭据的目录。"}
+}
