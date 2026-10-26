@@ -30,5 +30,13 @@
     "asset": "astrbot_plugin_chatgpt_vision-v0.1.3-test.zip",
     "sha256": "3da0dc9aa1c6e31c3556419e04ffa8574095af3c3be8f0664219fe410bba043b",
     "commit_subject": "导入 v0.1.3 测试快照"
+  },
+  {
+    "version": "0.1.4",
+    "tag": "v0.1.4-test",
+    "title": "v0.1.4-test · 群聊默认全员与独立授权",
+    "asset": "astrbot_plugin_chatgpt_vision-v0.1.4-test.zip",
+    "sha256": "14699d2784984f488ccd31107f62ca5fe23bbb673042568d916abe663443166a",
+    "commit_subject": "发布 v0.1.4 权限与简洁设置"
   }
 ]

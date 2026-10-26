@@ -1,16 +1,24 @@
 # AstrBot ChatGPT OAuth 识图
 
-官方 Sign in with ChatGPT 授权的图片描述、截图理解和 OCR，支持 QQ 直接附图与显式引用识图。
+[下载 v0.1.4 测试包](https://github.com/xiaomeng2568/Astrbot_plugin_chatgpt_vision/releases/tag/v0.1.4-test) · [历史版本](https://github.com/xiaomeng2568/Astrbot_plugin_chatgpt_vision/releases)
 
-[下载 v0.1.3 测试包](https://github.com/xiaomeng2568/Astrbot_plugin_chatgpt_vision/releases/tag/v0.1.3-test) · [全部历史版本](https://github.com/xiaomeng2568/Astrbot_plugin_chatgpt_vision/releases)
-
-历史原包按 v0.1.0 → v0.1.3 保存于 release-assets，中文说明见 release-notes。CI 在 Windows 与 Linux 上运行离线测试，并校验四版原包及内部文件清单。源码与文档来自独立开发的识图插件，未包含旧生图仓库、账号凭据或私人图片。
-
-# ChatGPT OAuth 识图：v0.1.3 本地测试包
+# ChatGPT OAuth 识图：v0.1.4 测试包
 
 独立的 AstrBot 插件，通过官方 Sign in with ChatGPT 开源应用授权流程调用公开 Responses API，支持图片描述、截图问答与 OCR。没有实现 OAuth 图像生成，也不把订阅授权当作 API Key。
 
 这是待服务器联调的测试版：离线测试通过不代表你的账号必定有权限、你的地区必定可访问，或与未知的第三方转述插件已经兼容。
+
+## v0.1.4 权限与简洁设置
+
+- 目标群：选择群聊后，全员可用；未选中的群不可用。
+- 群内单独授权：默认关闭。开启后显示“群内可用成员”，仅名单成员和机器人管理员可用。
+- 私聊可用用户：独立名单；空名单时仅机器人管理员可私聊使用。
+
+群内成员名单用于所有目标群，与私聊名单互不授权。目标群使用会话选择器，请只选群聊；成员和私聊名单使用用户选择器。选择器仅显示AstrBot已记录的会话/用户，找不到可先唤醒机器人，或手动填入。当前AstrBot原生选择器不支持按目标群筛选成员候选。AstrBot 4.29.3的WebUI尚无这两个选择器，会退回手动填写群号/QQ号；条件显示仍可用。点选需要支持sender_id/umo的新WebUI。
+
+升级保留旧群号和私聊名单；旧用户名单不再限制群内全员模式。群聊全员开放是本版明确变更，若需保持逐人限制，请开启“群内单独授权”并选择成员。群会话选择保存完整UMO，区分机器人实例；旧纯群号仍兼容。
+
+停用插件，覆盖文件后重载，检查设置并保存即可。不需重新授权，不改代理，不安装新依赖。设置项说明已精简。
 
 ## v0.1.3 手机端引用图片
 

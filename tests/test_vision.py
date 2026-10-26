@@ -670,6 +670,76 @@ class MessageTests(Base):
         self.assertEqual(self.plugin.image_references(event),['first'])
         self.assertEqual(self.plugin.image_references(event,True),['first','quoted'])
 
+    def test_selected_group_defaults_to_all_members_with_legacy_ids(self):
+        plugin=self.plugin_instance({'allowed_group_ids':['777']})
+        self.assertTrue(plugin._authorized(Event([],group='777',sender='999',admin=False)))
+        self.assertFalse(plugin._authorized(Event([],group='888',admin=True)))
+        self.assertFalse(self.plugin_instance({})._authorized(Event([],group='777',admin=True)))
+
+    def test_selected_group_umo_is_scoped_to_the_platform_instance(self):
+        plugin=self.plugin_instance({'allowed_group_ids':['qq-a:GroupMessage:777']})
+        event=Event([],group='777',admin=False)
+        event.unified_msg_origin='qq-a:GroupMessage:777'
+        self.assertTrue(plugin._authorized(event))
+        event.unified_msg_origin='qq-b:GroupMessage:777'
+        self.assertFalse(plugin._authorized(event))
+        event.unified_msg_origin='qq-a:GroupMessage:888';event.group='888'
+        self.assertFalse(plugin._authorized(event))
+
+    def test_group_restriction_and_private_permissions_are_independent(self):
+        config={'allowed_group_ids':['777'],'group_member_auth':True,
+                'group_allowed_user_ids':['member'],'allowed_user_ids':['private']}
+        plugin=self.plugin_instance(config)
+        cases=[('777','member',False,True),('777','private',False,False),
+               ('777','stranger',False,False),('777','admin',True,True),
+               ('888','member',False,False),('888','admin',True,False),
+               ('','member',False,False),('','private',False,True),
+               ('','stranger',False,False),('','admin',True,True)]
+        for group,sender,admin,expected in cases:
+            with self.subTest(group=group,sender=sender,admin=admin):
+                self.assertEqual(plugin._authorized(Event([],group,sender,admin)),expected)
+
+    def test_disabling_group_restriction_ignores_retained_member_list(self):
+        plugin=self.plugin_instance({'allowed_group_ids':['777'],'group_member_auth':False,
+                                     'group_allowed_user_ids':['member']})
+        self.assertTrue(plugin._authorized(Event([],group='777',sender='stranger',admin=False)))
+
+    def test_empty_member_list_restricts_group_to_bot_admins_when_enabled(self):
+        plugin=self.plugin_instance({'allowed_group_ids':['777'],'group_member_auth':True})
+        self.assertFalse(plugin._authorized(Event([],group='777',sender='stranger',admin=False)))
+        self.assertTrue(plugin._authorized(Event([],group='777',admin=True)))
+
+    def test_private_defaults_preserve_old_user_list(self):
+        plugin=self.plugin_instance({'allowed_user_ids':['123']})
+        self.assertTrue(plugin._authorized(Event([],sender='123',admin=False)))
+        self.assertFalse(plugin._authorized(Event([],sender='456',admin=False)))
+        self.assertTrue(plugin._authorized(Event([],sender='456',admin=True)))
+
+    async def test_group_without_member_restriction_can_reach_visual_model(self):
+        plugin=self.plugin_instance({'backend':'chatgpt_oauth','auto_reply':True,'allowed_group_ids':['777']})
+        event=Event([self.Image('image')],group='777',sender='stranger',admin=False)
+        await plugin.automatic_vision(event)
+        self.assertEqual(event.sent,['小猫在发呆。'])
+        plugin.fake_client.describe.assert_awaited_once()
+
+    async def test_restricted_group_rejects_before_quote_fetch_and_image_read(self):
+        plugin=self.plugin_instance({'backend':'chatgpt_oauth','allowed_group_ids':['777'],
+                                     'group_member_auth':True,'allowed_user_ids':['123']})
+        event=self.quote_event(group='777',sender='123',admin=False)
+        await plugin.describe_command(event)
+        event.bot.call_action.assert_not_awaited()
+        plugin.reader.read.assert_not_awaited();plugin.fake_client.describe.assert_not_awaited()
+
+    def test_schema_uses_native_selectors_and_conditional_member_list(self):
+        schema=json.loads((Path(__file__).resolve().parents[1]/'_conf_schema.json').read_text(encoding='utf-8'))
+        self.assertEqual(schema['allowed_group_ids']['_special'],'umo')
+        self.assertIs(schema['group_member_auth']['default'],False)
+        self.assertEqual(schema['group_member_auth']['type'],'bool')
+        self.assertEqual(schema['group_allowed_user_ids']['condition'],{'group_member_auth':True})
+        self.assertEqual(schema['group_allowed_user_ids']['_special'],'sender_id')
+        self.assertEqual(schema['allowed_user_ids']['_special'],'sender_id')
+        self.assertNotIn('condition',schema['allowed_user_ids'])
+
     def quote_event(self, result=None, **kwargs):
         event=Event([self.Reply()], **kwargs)
         if result is None:

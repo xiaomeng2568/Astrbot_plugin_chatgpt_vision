@@ -151,8 +151,17 @@ class ChatGPTVisionPlugin(Star):
 
     def _authorized(self, event) -> bool:
         group = str(event.get_group_id() or "")
-        if group and group not in {str(v) for v in self.config.get("allowed_group_ids", [])}:
-            return False
+        if group:
+            targets = {str(v).strip() for v in self.config.get("allowed_group_ids", [])}
+            # UMO selections isolate platform instances; retain legacy numeric IDs.
+            if group not in targets and str(event.unified_msg_origin) not in targets:
+                return False
+            if not self.config.get("group_member_auth", False):
+                return True
+            return event.is_admin() or str(event.get_sender_id()) in {
+                str(v) for v in self.config.get("group_allowed_user_ids", [])
+            }
+        # The old user list now applies only to private chats, preserving its values.
         return event.is_admin() or str(event.get_sender_id()) in {str(v) for v in self.config.get("allowed_user_ids", [])}
 
     def _claim(self, event) -> bool:
