@@ -146,10 +146,14 @@ async def diagnostic_call(client, args, operation):
             print(json.dumps(client.diagnostic, ensure_ascii=False, indent=2), flush=True)
 
 
+def default_data_dir(plugin_dir):
+    return Path(plugin_dir).resolve().parents[1] / 'plugin_data' / 'astrbot_plugin_chatgpt_vision'
+
+
 def main():
     parser = argparse.ArgumentParser(description="AstrBot official ChatGPT OAuth vision management")
     plugin_dir = Path(__file__).resolve().parent
-    parser.add_argument("--data-dir", default=str(plugin_dir.parents[1] / "plugin_data" / plugin_dir.name))
+    parser.add_argument("--data-dir", default=str(default_data_dir(plugin_dir)))
     parser.add_argument("--proxy", default=None, help="Override this command's HTTP(S) proxy. Empty string uses system proxy discovery.")
     parser.add_argument("--timeout", type=int, default=180, help="Total request timeout in seconds, bounded to 10..300")
     parser.add_argument("--diagnostic", action="store_true", help="Print allowlisted diagnostic metadata, never raw server content")

@@ -81,7 +81,7 @@ class PublicationTests(unittest.TestCase):
             self.invoke(existing_tag=True)
         self.assertTrue(all(method == 'GET' for method, _, _ in self.calls))
 
-    def test_companion_zip_and_checksum_are_uploaded_before_publication(self):
+    def test_legacy_companion_metadata_does_not_publish_statistics_assets(self):
         name = 'companion.zip'
         self.plan[0]['extra_assets'] = [{'asset': name}]
         (self.root / 'release-assets' / name).write_bytes(b'companion zip')
@@ -90,8 +90,8 @@ class PublicationTests(unittest.TestCase):
         self.invoke()
         first_publish = next(i for i, call in enumerate(self.calls) if call[0] == 'PATCH')
         uploads = [url for method, url, _ in self.calls[:first_publish] if url.startswith('https://uploads.')]
-        self.assertEqual(len(uploads), 4)
-        self.assertTrue(any('name=companion.zip.sha256' in url for url in uploads))
+        self.assertEqual(len(uploads), 2)
+        self.assertFalse(any('name=companion.zip' in url for url in uploads))
 
     def test_local_or_pr_invocation_cannot_publish(self):
         with patch.dict(os.environ, {'GITHUB_ACTIONS': 'false', 'GITHUB_REF': 'refs/heads/main'}), \

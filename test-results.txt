@@ -1,6 +1,8 @@
-v0.1.5 offline validation
-Vision, usage capture and publication safety: 102 tests passed on Windows/Python 3.12.
-Standalone statistics plugin: 43 tests passed locally.
-Both suites also run on Windows/Linux GitHub Actions before release.
-Archive verification checks historical digests, per-file manifests, source parity and original logo SHA-256.
-No real accounts, private images or live model requests used.
+v0.1.5-fix1 validation
+104 local offline tests passed on Windows/Python 3.12.
+Runtime constructor explicitly requests astrbot_plugin_chatgpt_vision.
+Management default uses the same namespace, including renamed checkouts.
+Regression verifies parent permissions and shared root remain unchanged.
+Token statistics moved to its own repository; no companion ZIP is published here.
+Historical OAuth archive hashes remain unchanged.
+No real accounts or QQ end-to-end calls used.

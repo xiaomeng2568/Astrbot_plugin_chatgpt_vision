@@ -10,12 +10,12 @@ ROOT = Path(__file__).resolve().parents[1]
 
 def verify():
     plan = json.loads((ROOT / 'release-plan.json').read_text(encoding='utf-8'))
-    assert [p['version'] for p in plan] == ['0.1.0', '0.1.1', '0.1.2', '0.1.3', '0.1.4', '0.1.5']
+    assert [p['tag'] for p in plan] == [f'v0.1.{i}-test' for i in range(6)] + ['v0.1.5-fix1']
     items = []
     for release in plan:
         assert (ROOT / 'release-notes' / (release['tag'] + '.md')).is_file()
-        items.append(release)
-        items.extend(release.get('extra_assets', []))
+        assert not release.get('extra_assets'), 'OAuth releases must not bundle other plugins'
+        items.append(dict(release, verify_source=release is plan[-1]))
     for item in items:
         archive = ROOT / 'release-assets' / item['asset']
         digest = hashlib.sha256(archive.read_bytes()).hexdigest()
@@ -41,7 +41,7 @@ def verify():
                 assert hashlib.sha256(z.read(prefix + rel)).hexdigest() == expected
                 covered.add(prefix + rel)
             assert covered == set(names) - {prefix + 'MANIFEST.sha256'}
-            if item['version'] == '0.1.5' or item.get('plugin') == 'astrbot_plugin_token_usage':
+            if item.get('verify_source'):
                 source = ROOT if prefix == 'astrbot_plugin_chatgpt_vision/' else ROOT / 'companion' / item['plugin']
                 for name in covered:
                     data = (source / name[len(prefix):]).read_bytes()
