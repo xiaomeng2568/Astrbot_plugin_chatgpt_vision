@@ -38,5 +38,22 @@
     "asset": "astrbot_plugin_chatgpt_vision-v0.1.4-test.zip",
     "sha256": "14699d2784984f488ccd31107f62ca5fe23bbb673042568d916abe663443166a",
     "commit_subject": "发布 v0.1.4 权限与简洁设置（清单校正）"
+  },
+  {
+    "version": "0.1.5",
+    "asset": "astrbot_plugin_chatgpt_vision-v0.1.5-test.zip",
+    "sha256": "8945164c5dc74f2b894c4e0561d4047e973d765a06538ac254b6bf8efd70296e",
+    "plugin": "astrbot_plugin_chatgpt_vision",
+    "tag": "v0.1.5-test",
+    "title": "v0.1.5-test · 可选用量统计与插件图标",
+    "commit_subject": "发布 v0.1.5 可选用量统计与原始图标",
+    "extra_assets": [
+      {
+        "version": "0.1.0",
+        "asset": "astrbot_plugin_token_usage-v0.1.0-test.zip",
+        "sha256": "b6aca9d2a255f31c950abd7dbf525506d62ea742d405fc56c8f1fb3677ef2519",
+        "plugin": "astrbot_plugin_token_usage"
+      }
+    ]
   }
 ]

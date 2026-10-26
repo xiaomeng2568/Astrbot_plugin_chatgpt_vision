@@ -1,0 +1,48 @@
+test_close_mid_stream_and_next_call_do_not_leak_context (test_meter.ObserverTests.test_close_mid_stream_and_next_call_do_not_leak_context) ... ok
+test_concurrent_scope_and_repeated_install (test_meter.ObserverTests.test_concurrent_scope_and_repeated_install) ... ok
+test_failure_and_cancel_are_not_swallowed (test_meter.ObserverTests.test_failure_and_cancel_are_not_swallowed) ... ok
+test_nested_plain_stream_is_not_double_counted (test_meter.ObserverTests.test_nested_plain_stream_is_not_double_counted) ... ok
+test_normal_call_is_unchanged_and_actual_model_is_recorded (test_meter.ObserverTests.test_normal_call_is_unchanged_and_actual_model_is_recorded) ... ok
+test_observer_failure_cannot_break_provider (test_meter.ObserverTests.test_observer_failure_cannot_break_provider) ... ok
+test_restore_does_not_remove_later_third_party_wrapper (test_meter.ObserverTests.test_restore_does_not_remove_later_third_party_wrapper) ... ok
+test_stream_uses_last_aggregate_not_sum (test_meter.ObserverTests.test_stream_uses_last_aggregate_not_sum) ... ok
+test_actual_cache_is_not_double_counted (test_meter.PriceTests.test_actual_cache_is_not_double_counted) ... ok
+test_missing_invalid_or_unmatched_prices_are_unknown (test_meter.PriceTests.test_missing_invalid_or_unmatched_prices_are_unknown) ... ok
+test_provider_specific_price_wins (test_meter.PriceTests.test_provider_specific_price_wins) ... ok
+test_subscription_cannot_be_priced_as_api (test_meter.PriceTests.test_subscription_cannot_be_priced_as_api) ... ok
+test_unknown_cache_can_only_use_equal_input_rates (test_meter.PriceTests.test_unknown_cache_can_only_use_equal_input_rates) ... ok
+test_write_cache_requires_explicit_price (test_meter.PriceTests.test_write_cache_requires_explicit_price) ... ok
+test_calendar_day_and_week_boundary_in_shanghai (test_meter.ReportTests.test_calendar_day_and_week_boundary_in_shanghai) ... ok
+test_small_cost_is_not_rounded_to_free (test_meter.ReportTests.test_small_cost_is_not_rounded_to_free) ... ok
+test_duplicate_report_counts_once_but_separate_calls_count_twice (test_meter.StoreTests.test_duplicate_report_counts_once_but_separate_calls_count_twice) ... ok
+test_failure_without_usage_is_recorded_as_unknown (test_meter.StoreTests.test_failure_without_usage_is_recorded_as_unknown) ... ok
+test_no_plain_scope_ids_prompts_or_tokens_on_disk (test_meter.StoreTests.test_no_plain_scope_ids_prompts_or_tokens_on_disk) ... ok
+test_prices_snapshot_and_currency_separation (test_meter.StoreTests.test_prices_snapshot_and_currency_separation) ... ok
+test_restart_preserves_hash_key_and_history (test_meter.StoreTests.test_restart_preserves_hash_key_and_history) ... ok
+test_retention_count_and_model_filters (test_meter.StoreTests.test_retention_count_and_model_filters) ... ok
+test_scope_and_conversation_isolation (test_meter.StoreTests.test_scope_and_conversation_isolation) ... ok
+test_subscription_mix_does_not_appear_as_all_free (test_meter.StoreTests.test_subscription_mix_does_not_appear_as_all_free) ... ok
+test_weighted_cache_ratio_and_missing_coverage (test_meter.StoreTests.test_weighted_cache_ratio_and_missing_coverage) ... ok
+test_anthropic_split_input_and_write (test_meter.UsageTests.test_anthropic_split_input_and_write) ... ok
+test_astrbot_zero_cache_is_not_evidence_of_cache_reporting (test_meter.UsageTests.test_astrbot_zero_cache_is_not_evidence_of_cache_reporting) ... ok
+test_deepseek_and_chat (test_meter.UsageTests.test_deepseek_and_chat) ... ok
+test_gemini_reasoning_is_included_once (test_meter.UsageTests.test_gemini_reasoning_is_included_once) ... ok
+test_invalid_counters_are_unknown (test_meter.UsageTests.test_invalid_counters_are_unknown) ... ok
+test_raw_is_preferred_over_normalized_default (test_meter.UsageTests.test_raw_is_preferred_over_normalized_default) ... ok
+test_responses_real_zero_and_missing_cache_are_distinct (test_meter.UsageTests.test_responses_real_zero_and_missing_cache_are_distinct) ... ok
+test_unrecognized_usage_and_sensitive_metadata_are_not_copied (test_meter.UsageTests.test_unrecognized_usage_and_sensitive_metadata_are_not_copied) ... ok
+test_admin_only_default_policy (test_plugin.PluginTests.test_admin_only_default_policy) ... ok
+test_command_never_calls_llm_and_default_empty_message_is_truthful (test_plugin.PluginTests.test_command_never_calls_llm_and_default_empty_message_is_truthful) ... ok
+test_current_conversation_and_model_filter (test_plugin.PluginTests.test_current_conversation_and_model_filter) ... ok
+test_oauth_bridge_reports_subscription_and_deduplicates (test_plugin.PluginTests.test_oauth_bridge_reports_subscription_and_deduplicates) ... ok
+test_query_uses_configured_prices_only_for_api (test_plugin.PluginTests.test_query_uses_configured_prices_only_for_api) ... ok
+test_record_failure_logs_no_private_payload (test_plugin.PluginTests.test_record_failure_logs_no_private_payload) ... ok
+test_regular_user_cannot_query_global_or_other_session (test_plugin.PluginTests.test_regular_user_cannot_query_global_or_other_session) ... ok
+test_render_failure_falls_back_to_text (test_plugin.PluginTests.test_render_failure_falls_back_to_text) ... ok
+test_shutdown_drains_queue_and_disabled_plugin_records_nothing (test_plugin.PluginTests.test_shutdown_drains_queue_and_disabled_plugin_records_nothing) ... ok
+test_unknown_conversation_does_not_merge_all_conversations (test_plugin.PluginTests.test_unknown_conversation_does_not_merge_all_conversations) ... ok
+
+----------------------------------------------------------------------
+Ran 43 tests in 0.660s
+
+OK

@@ -1,6 +1,6 @@
 # AstrBot ChatGPT OAuth 识图
 
-[下载 v0.1.4 测试包](https://github.com/xiaomeng2568/Astrbot_plugin_chatgpt_vision/releases/tag/v0.1.4-test) · [历史版本](https://github.com/xiaomeng2568/Astrbot_plugin_chatgpt_vision/releases)
+[下载 v0.1.5 测试包](https://github.com/xiaomeng2568/Astrbot_plugin_chatgpt_vision/releases/tag/v0.1.5-test) · [历史版本](https://github.com/xiaomeng2568/Astrbot_plugin_chatgpt_vision/releases)
 
 独立的 AstrBot 插件，通过官方 Sign in with ChatGPT 开源应用授权流程调用公开 Responses API，支持图片描述、截图问答与 OCR。没有实现 OAuth 图像生成，也不把订阅授权当作 API Key。
 
@@ -85,6 +85,12 @@ python manage.py select-model <同一个slug>
 自动接管使用 `on_waiting_llm_request`，完成后停止内置 Agent 后续请求。它可阻止后面的内置转述和二次回复，但**无法追回另一个第三方插件更早已主动发出的消息**，也无法阻止一个不遵循事件停止状态的插件后台任务。本地没有服务器旧插件，因此尚未验证这一点。若重复回复，先关 auto_reply，保留显式指令并反馈旧插件名称、版本和触发顺序。
 
 OAuth失败时不会自动把原图发给DeepSeek或其他供应商。若希望整个会话仍走原有图片转述，设置 `backend=existing` 即可；本插件不代替或重写服务器旧插件。
+
+## 用量统计
+
+如需统计QQ识图用量，另从文件安装本次Release中的“模型用量统计”插件ZIP。安装后发送 `/token` 查看今日统计，`/token 近7天` 或 `/token 累计` 查询其他周期；默认仅机器人管理员可查。
+
+OAuth识图仅上报接口返回的数字用量，不提供API费用或订阅余额。未知用量不按0计算；不安装统计插件也能正常识图，不需重新授权。命令行自检和模型目录查询不计入QQ识图统计。
 
 ## 六、人格与隐私
 

@@ -158,13 +158,13 @@ async def detect_stream(content, diagnostic):
     return kind, PrefetchedContent(prefix, iterator)
 
 
-async def response_answer(content, diagnostic):
+async def response_answer(content, diagnostic, meter=None):
     kind, replay = await detect_stream(content, diagnostic)
     if kind == "sse":
         diagnostic["stage"] = "sse_stream"
         if diagnostic.get("content_type") != "text/event-stream":
             diagnostic["header_body_mismatch"] = True
-        return await read_answer(replay, diagnostic)
+        return await read_answer(replay, diagnostic, meter)
     if kind == "json":
         diagnostic["stage"] = "json_response"
         try:
@@ -184,7 +184,30 @@ async def response_answer(content, diagnostic):
     raise VisionError("protocol")
 
 
-async def read_answer(content, diagnostic=None) -> str:
+def capture_usage(response, meter):
+    """Copy numeric usage only into a separate meter, never the diagnostic output."""
+    if meter is None or not isinstance(response, dict):
+        return
+    usage = response.get('usage')
+    if isinstance(usage, dict):
+        counters = {}
+        for name in ('input_tokens', 'output_tokens'):
+            value = usage.get(name)
+            if isinstance(value, int) and not isinstance(value, bool) and 0 <= value <= 10**9:
+                counters[name] = value
+        details = usage.get('input_tokens_details')
+        if isinstance(details, dict):
+            copied = {k: v for k, v in details.items() if k in {'cached_tokens', 'cache_write_tokens'}
+                      and isinstance(v, int) and not isinstance(v, bool) and 0 <= v <= 10**9}
+            if copied:
+                counters['input_tokens_details'] = copied
+        meter['usage'] = counters
+    model = response.get('model')
+    if isinstance(model, str) and re.fullmatch(r'[A-Za-z0-9._/-]{1,160}', model):
+        meter['model'] = model
+
+
+async def read_answer(content, diagnostic=None, meter=None) -> str:
     diagnostic = diagnostic if diagnostic is not None else {}
     parts = []
     total_chars = 0
@@ -205,6 +228,7 @@ async def read_answer(content, diagnostic=None) -> str:
             refused = True
         elif kind in {"response.failed", "error"}:
             response = data.get("response", data)
+            capture_usage(response, meter)
             record_error(diagnostic, response)
             diagnostic["failure_reason"] = "stream_failed"
             code = error_code(response) if isinstance(response, dict) else ""
@@ -221,10 +245,12 @@ async def read_answer(content, diagnostic=None) -> str:
                 raise VisionError("permission")
             raise VisionError("protocol")
         elif kind == "response.incomplete":
+            capture_usage(data.get('response'), meter)
             diagnostic["failure_reason"] = "response_incomplete"
             raise VisionError("incomplete")
         elif kind == "response.completed":
             response = data.get("response", {})
+            capture_usage(response, meter)
             if response.get("status") != "completed" or response.get("error"):
                 diagnostic["failure_reason"] = "invalid_completed_state"
                 raise VisionError("incomplete")
@@ -291,9 +317,13 @@ class VisionClient:
         self.cooldown_until = 0.0
         self.diagnostic = {}
         self.self_test_phase = None
+        self.last_meter = {}
 
     async def _call(self, url: str, payload: dict | None = None, expected_account: str | None = None):
         operation = "responses" if payload else "models"
+        if payload:
+            self.last_meter = {'started': False, 'reported': False, 'request_id': secrets.token_hex(16),
+                               'model': payload.get('model', ''), 'usage': {}}
         self.diagnostic = {"operation": operation, "stage": "credential", "timeout_seconds": self.timeout}
         if self.self_test_phase in {"text", "vision", "select"}:
             self.diagnostic["self_test_phase"] = self.self_test_phase
@@ -308,6 +338,8 @@ class VisionClient:
                 headers["Cache-Control"] = "no-cache"
             self.diagnostic["stage"] = "http_connect"
             try:
+                if payload:
+                    self.last_meter['started'] = True
                 async with self.session.request("POST" if payload else "GET", url, json=payload,
                                                 headers=headers, allow_redirects=False,
                                                 timeout=aiohttp.ClientTimeout(total=self.timeout, sock_connect=30, sock_read=self.timeout)) as response:
@@ -336,7 +368,7 @@ class VisionClient:
                     if payload:
                         self.diagnostic["stage"] = "response_format"
                         try:
-                            result = await response_answer(response.content, self.diagnostic)
+                            result = await response_answer(response.content, self.diagnostic, self.last_meter)
                         except VisionError as exc:
                             if exc.code == "quota":
                                 self.cooldown_until = time.monotonic() + 60
@@ -450,6 +482,7 @@ class VisionClient:
             self.store.save(state)
 
     async def describe(self, prompt: str, images: list[str], persona="", max_chars=500) -> str:
+        self.last_meter = {}
         state = self.store.load()
         account = self.store.active(state)
         identity = state["active"]

@@ -20,7 +20,7 @@ from cryptography.hazmat.primitives import hashes
 from cryptography.hazmat.primitives.asymmetric import padding, rsa
 from PIL import Image, ImageDraw
 
-from vision.client import (VisionClient, make_probe, plain_output, read_answer, request_body)
+from vision.client import (VisionClient, capture_usage, make_probe, plain_output, read_answer, request_body)
 from vision.errors import VisionError
 from vision.images import ImageReader, PublicResolver, check_url, normalize_image, read_local
 from vision.oauth import ISSUER, JWKS, TOKEN, OAuth, consume_callback, new_transaction, validate_id_token
@@ -739,6 +739,45 @@ class MessageTests(Base):
         self.assertEqual(schema['group_allowed_user_ids']['_special'],'sender_id')
         self.assertEqual(schema['allowed_user_ids']['_special'],'sender_id')
         self.assertNotIn('condition',schema['allowed_user_ids'])
+
+    async def test_oauth_usage_bridge_reports_success_without_content(self):
+        plugin=self.plugin_instance({})
+        service=types.SimpleNamespace(ingest_external=AsyncMock())
+        plugin.context=types.SimpleNamespace(get_registered_star=lambda name:types.SimpleNamespace(activated=True,star_cls=service))
+        async def describe(*args):
+            plugin.fake_client.last_meter={'started':True,'reported':False,'request_id':'request-one','model':'account-model',
+                                           'usage':{'input_tokens':100,'output_tokens':20}}
+            return 'private image description'
+        plugin.fake_client.describe.side_effect=describe
+        result=await plugin._metered_describe(Event([]),plugin.fake_client,'PRIVATE_PROMPT',[PRIVATE_IMAGE],'',500)
+        self.assertEqual(result,'private image description')
+        call=service.ingest_external.await_args.kwargs
+        self.assertEqual(call['status'],'completed');self.assertEqual(call['usage']['input_tokens'],100)
+        self.assertNotIn(PRIVATE_IMAGE,str(call));self.assertNotIn('PRIVATE_PROMPT',str(call))
+
+    async def test_usage_bridge_failure_does_not_break_image_answer_or_leak_error(self):
+        plugin=self.plugin_instance({})
+        service=types.SimpleNamespace(ingest_external=AsyncMock(side_effect=RuntimeError(SENTINEL+' '+PRIVATE_IMAGE)))
+        plugin.context=types.SimpleNamespace(get_registered_star=lambda name:types.SimpleNamespace(activated=True,star_cls=service))
+        async def describe(*args):
+            plugin.fake_client.last_meter={'started':True,'request_id':'one','usage':{},'model':'model'}
+            return 'answer'
+        plugin.fake_client.describe.side_effect=describe
+        with self.assertLogs('vision-test',level='WARNING') as logs:
+            result=await plugin._metered_describe(Event([]),plugin.fake_client,'',[], '',500)
+        self.assertEqual(result,'answer');self.assertNotIn(SENTINEL,str(logs.output));self.assertNotIn(PRIVATE_IMAGE,str(logs.output))
+
+    async def test_failed_image_request_is_reported_as_unknown_usage_and_original_failure_preserved(self):
+        plugin=self.plugin_instance({})
+        service=types.SimpleNamespace(ingest_external=AsyncMock())
+        plugin.context=types.SimpleNamespace(get_registered_star=lambda name:types.SimpleNamespace(activated=True,star_cls=service))
+        async def fail(*args):
+            plugin.fake_client.last_meter={'started':True,'request_id':'one','usage':{},'model':'model'}
+            raise VisionError('network')
+        plugin.fake_client.describe.side_effect=fail
+        with self.assertRaises(VisionError):await plugin._metered_describe(Event([]),plugin.fake_client,'',[], '',500)
+        self.assertEqual(service.ingest_external.await_args.kwargs['status'],'failed')
+        self.assertEqual(service.ingest_external.await_args.kwargs['usage'],{})
 
     def quote_event(self, result=None, **kwargs):
         event=Event([self.Reply()], **kwargs)

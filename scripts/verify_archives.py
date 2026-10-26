@@ -10,18 +10,22 @@ ROOT = Path(__file__).resolve().parents[1]
 
 def verify():
     plan = json.loads((ROOT / 'release-plan.json').read_text(encoding='utf-8'))
-    assert [p['version'] for p in plan] == ['0.1.0', '0.1.1', '0.1.2', '0.1.3', '0.1.4']
-    for item in plan:
+    assert [p['version'] for p in plan] == ['0.1.0', '0.1.1', '0.1.2', '0.1.3', '0.1.4', '0.1.5']
+    items = []
+    for release in plan:
+        assert (ROOT / 'release-notes' / (release['tag'] + '.md')).is_file()
+        items.append(release)
+        items.extend(release.get('extra_assets', []))
+    for item in items:
         archive = ROOT / 'release-assets' / item['asset']
         digest = hashlib.sha256(archive.read_bytes()).hexdigest()
         assert digest == item['sha256']
         assert digest == archive.with_suffix('.zip.sha256').read_text().split()[0]
-        assert (ROOT / 'release-notes' / (item['tag'] + '.md')).is_file()
         with zipfile.ZipFile(archive) as z:
             assert z.testzip() is None
             names = z.namelist()
             assert len(names) == len(set(names))
-            prefix = 'astrbot_plugin_chatgpt_vision/'
+            prefix = item.get('plugin', 'astrbot_plugin_chatgpt_vision') + '/'
             for name in names:
                 path = PurePosixPath(name)
                 assert name.startswith(prefix) and '..' not in path.parts and not path.is_absolute()
@@ -37,7 +41,16 @@ def verify():
                 assert hashlib.sha256(z.read(prefix + rel)).hexdigest() == expected
                 covered.add(prefix + rel)
             assert covered == set(names) - {prefix + 'MANIFEST.sha256'}
-        print(item['tag'] + ': archive, manifest and notes OK')
+            if item['version'] == '0.1.5' or item.get('plugin') == 'astrbot_plugin_token_usage':
+                source = ROOT if prefix == 'astrbot_plugin_chatgpt_vision/' else ROOT / 'companion' / item['plugin']
+                for name in covered:
+                    data = (source / name[len(prefix):]).read_bytes()
+                    if not name.endswith('.png'):
+                        data = data.replace(b'\r\n', b'\n')
+                    assert z.read(name) == data, 'Archive differs from source: ' + name
+            if item['version'] == '0.1.5':
+                assert hashlib.sha256(z.read(prefix + 'logo.png')).hexdigest() == 'c035c48b8b86e676d9ca69481bf99d9c4d03f5e4435f7571ef8667f1fb751da6'
+        print(item['asset'] + ': archive, manifest and notes OK')
 
 
 if __name__ == '__main__':

@@ -31,9 +31,14 @@ jobs:
           cache: pip
       - name: 安装CI测试依赖
         run: python -m pip install -r requirements.txt
-      - name: 检查四版原包和发布文案
+      - name: 检查历史原包、新安装包和发布文案
         run: python scripts/verify_archives.py
       - name: 运行离线测试（不登录真实账号）
+        env:
+          PYTHONIOENCODING: utf-8
+        run: python -m unittest discover -s tests -v
+      - name: 独立用量统计插件离线回归
+        working-directory: companion/astrbot_plugin_token_usage
         env:
           PYTHONIOENCODING: utf-8
         run: python -m unittest discover -s tests -v
