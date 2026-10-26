@@ -118,3 +118,7 @@ python manage.py logout
 - https://developers.openai.com/siwc/token-sharing-open-source/preview-limitations
 - https://docs.astrbot.app/dev/star/guides/listen-message-event.html
 - https://docs.astrbot.app/dev/star/guides/ai.html
+
+## 许可证
+
+本项目采用 [MIT License](LICENSE)。允许使用、修改、分发和商用，须保留版权及许可声明；软件按原样提供，不作担保。第三方依赖遵循各自许可证。
