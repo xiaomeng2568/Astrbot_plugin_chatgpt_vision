@@ -37,6 +37,6 @@
     "title": "v0.1.4-test · 群聊默认全员与独立授权",
     "asset": "astrbot_plugin_chatgpt_vision-v0.1.4-test.zip",
     "sha256": "14699d2784984f488ccd31107f62ca5fe23bbb673042568d916abe663443166a",
-    "commit_subject": "发布 v0.1.4 权限与简洁设置"
+    "commit_subject": "发布 v0.1.4 权限与简洁设置（清单校正）"
   }
 ]
