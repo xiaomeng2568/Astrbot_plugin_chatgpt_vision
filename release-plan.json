@@ -56,5 +56,14 @@
     "tag": "v0.1.5-fix1",
     "title": "v0.1.5",
     "commit_subject": "修正 v0.1.5 修复包的 Windows 路径回归测试"
+  },
+  {
+    "version": "0.1.5-alpha1",
+    "asset": "astrbot_plugin_chatgpt_vision-v0.1.5-alpha1.zip",
+    "sha256": "22ce454d41311e8ca8128a382b94e5be5aae1e564f2ce395666453099fb06a6e",
+    "plugin": "astrbot_plugin_chatgpt_vision",
+    "tag": "v0.1.5-alpha1",
+    "title": "v0.1.5-alpha1",
+    "commit_subject": "发布 v0.1.5-alpha1"
   }
 ]

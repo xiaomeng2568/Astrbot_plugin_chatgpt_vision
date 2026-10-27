@@ -1,6 +1,6 @@
 # AstrBot ChatGPT OAuth 识图
 
-[下载 v0.1.5 测试包](https://github.com/xiaomeng2568/Astrbot_plugin_chatgpt_vision/releases/tag/v0.1.5-fix1) · [历史版本](https://github.com/xiaomeng2568/Astrbot_plugin_chatgpt_vision/releases)
+[下载 v0.1.5-alpha1 测试包](https://github.com/xiaomeng2568/Astrbot_plugin_chatgpt_vision/releases/tag/v0.1.5-alpha1) · [历史版本](https://github.com/xiaomeng2568/Astrbot_plugin_chatgpt_vision/releases)
 
 独立的 AstrBot 插件，通过官方 Sign in with ChatGPT 开源应用授权流程调用公开 Responses API，支持图片描述、截图问答与 OCR。没有实现 OAuth 图像生成，也不把订阅授权当作 API Key。
 
@@ -132,3 +132,5 @@ python manage.py logout
 ## v0.1.5 数据目录修正
 
 修正版显式使用 StarTools.get_data_dir("astrbot_plugin_chatgpt_vision")，与 manage.py 默认目录一致。授权文件只保存在 data/plugin_data/astrbot_plugin_chatgpt_vision/，不读取或修改共享根目录的文件及权限。旧版若曾将文件写到共享根目录，请先停用插件、备份，再由管理员将确认属于本插件的 oauth-state.bin 移入该专属目录；POSIX目录权限为0700、文件为0600。不要搬动运行中的锁文件，不要递归修改共享根目录权限。如原本已在专属目录授权，无需迁移。
+
+当前发布版本为 v0.1.5-alpha1。使用新的版本标识重新提交 AstrBot 审核；数据目录修复及功能与上一修正版一致。
