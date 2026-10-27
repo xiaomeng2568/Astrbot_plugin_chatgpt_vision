@@ -63,7 +63,7 @@ def main():
         release = request('GET', '/releases/tags/' + tag)
         if release is None:
             release = request('POST', '/releases', {
-                'tag_name': tag, 'target_commitish': commit, 'name': tag.split('-', 1)[0],
+                'tag_name': tag, 'target_commitish': commit, 'name': item['title'],
                 'body': (ROOT / 'release-notes' / (tag + '.md')).read_text(encoding='utf-8'),
                 'draft': True, 'prerelease': True, 'make_latest': 'false'})
         assets = {a['name']: a for a in request('GET', '/releases/' + str(release['id']) + '/assets')}

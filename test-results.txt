@@ -1,4 +1,4 @@
-v0.1.5-fix1 validation
+v0.1.5-alpha1 validation
 104 local offline tests passed on Windows/Python 3.12.
 Runtime constructor explicitly requests astrbot_plugin_chatgpt_vision.
 Management default uses the same namespace, including renamed checkouts.

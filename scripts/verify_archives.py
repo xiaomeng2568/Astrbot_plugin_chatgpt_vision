@@ -10,7 +10,7 @@ ROOT = Path(__file__).resolve().parents[1]
 
 def verify():
     plan = json.loads((ROOT / 'release-plan.json').read_text(encoding='utf-8'))
-    assert [p['tag'] for p in plan] == [f'v0.1.{i}-test' for i in range(6)] + ['v0.1.5-fix1']
+    assert [p['tag'] for p in plan] == [f'v0.1.{i}-test' for i in range(6)] + ['v0.1.5-fix1', 'v0.1.5-alpha1']
     items = []
     for release in plan:
         assert (ROOT / 'release-notes' / (release['tag'] + '.md')).is_file()
@@ -48,7 +48,7 @@ def verify():
                     if not name.endswith('.png'):
                         data = data.replace(b'\r\n', b'\n')
                     assert z.read(name) == data, 'Archive differs from source: ' + name
-            if item['version'] == '0.1.5':
+            if item['version'].startswith('0.1.5'):
                 assert hashlib.sha256(z.read(prefix + 'logo.png')).hexdigest() == 'c035c48b8b86e676d9ca69481bf99d9c4d03f5e4435f7571ef8667f1fb751da6'
         print(item['asset'] + ': archive, manifest and notes OK')
 
